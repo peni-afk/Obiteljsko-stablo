@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obiteljsko Stablo</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0d0f0a;--paper:#f5f0e8;--ink:#1a1c14;--gold:#c9a84c;--gold-light:#e8c97a;--card-bg:rgba(245,240,232,0.97);--shadow:rgba(0,0,0,0.6);}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);font-family:'Crimson Pro',serif;min-height:100vh;overflow:hidden;}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(ellipse at 20% 80%,rgba(74,124,89,.07) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(124,74,110,.07) 0%,transparent 50%);}
+
+  /* ── Auth screens ── */
+  #auth-screen{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+  .auth-box{background:var(--paper);width:380px;max-width:95vw;border-radius:6px;box-shadow:0 20px 80px rgba(0,0,0,.8);overflow:hidden;}
+  .auth-header{padding:28px 30px 20px;border-bottom:1px solid rgba(26,28,20,.1);text-align:center;}
+  .auth-header h1{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--ink);font-style:italic;}
+  .auth-header p{font-size:.85rem;color:rgba(26,28,20,.5);margin-top:4px;}
+  .auth-body{padding:24px 30px;}
+  .auth-footer{padding:0 30px 24px;display:flex;flex-direction:column;gap:10px;}
+  .auth-tabs{display:flex;border-bottom:1px solid rgba(26,28,20,.1);margin-bottom:20px;}
+  .auth-tab{flex:1;padding:10px;text-align:center;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;color:rgba(26,28,20,.4);border-bottom:2px solid transparent;transition:all .2s;}
+  .auth-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+  .auth-error{background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.3);color:#c0392b;padding:10px 14px;border-radius:3px;font-size:.84rem;margin-bottom:14px;display:none;}
+  .auth-info{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);color:#7a5f1a;padding:10px 14px;border-radius:3px;font-size:.84rem;margin-bottom:14px;display:none;}
+  .google-btn{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border:1px solid rgba(26,28,20,.2);background:#fff;border-radius:3px;cursor:pointer;font-family:'Crimson Pro',serif;font-size:.9rem;color:var(--ink);transition:all .2s;}
+  .google-btn:hover{border-color:var(--gold);background:#fffdf7;}
+  .google-btn img{width:18px;height:18px;}
+  .divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:rgba(26,28,20,.3);font-size:.78rem;}
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(26,28,20,.1);}
+
+  /* Pending approval screen */
+  #pending-screen{position:fixed;inset:0;z-index:999;display:none;align-items:center;justify-content:center;background:var(--bg);}
+  .pending-box{background:var(--paper);width:400px;max-width:95vw;border-radius:6px;box-shadow:0 20px 80px rgba(0,0,0,.8);padding:40px;text-align:center;}
+  .pending-box h2{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--ink);margin-bottom:12px;}
+  .pending-box p{font-size:.92rem;color:rgba(26,28,20,.6);line-height:1.6;}
+
+  /* ── Header ── */
+  .header{position:fixed;top:0;left:0;right:0;z-index:200;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(to bottom,rgba(13,15,10,.96) 70%,transparent);}
+  .header h1{font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--gold);font-style:italic;}
+  .header-actions{display:flex;gap:8px;align-items:center;}
+  .user-badge{font-size:.75rem;color:rgba(245,240,232,.45);letter-spacing:.04em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .btn{padding:7px 16px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-family:'Crimson Pro',serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .25s;border-radius:2px;white-space:nowrap;}
+  .btn:hover{background:var(--gold);color:var(--bg);}
+  .btn-primary{background:var(--gold);color:var(--bg);}
+  .btn-primary:hover{background:var(--gold-light);border-color:var(--gold-light);}
+  .btn-danger{border-color:#c0392b;color:#c0392b;}
+  .btn-danger:hover{background:#c0392b;color:#fff;}
+  .btn.active{background:var(--gold);color:var(--bg);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  /* ── Canvas & SVG ── */
+  #svg-lines{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible;}
+  #canvas{position:fixed;inset:0;z-index:4;cursor:grab;}
+  #canvas:active{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;}
+  body.connect-mode #canvas{cursor:crosshair;}
+
+  /* ── Nodes ── */
+  .node{position:absolute;transform:translate(-50%,-50%);cursor:pointer;user-select:none;z-index:5;}
+  .node-card{width:148px;background:var(--card-bg);border-radius:4px;overflow:hidden;box-shadow:0 4px 20px var(--shadow),0 0 0 1px rgba(201,168,76,.25);transition:box-shadow .2s,transform .2s;}
+  .node-card:hover{box-shadow:0 8px 36px var(--shadow),0 0 0 2px var(--gold);transform:scale(1.04);}
+  .node-card.connect-selected{box-shadow:0 0 0 3px var(--gold),0 8px 36px rgba(201,168,76,.4)!important;transform:scale(1.07)!important;}
+  .node-card.pending-card{opacity:.6;filter:grayscale(.4);}
+  .node-color-bar{height:5px;width:100%;}
+  .node-photo{width:100%;height:88px;object-fit:cover;display:block;}
+  .node-photo-ph{width:100%;height:88px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e8e3d8,#d4cfc4);font-size:2rem;color:rgba(26,28,20,.22);}
+  .node-info{padding:7px 10px 9px;}
+  .node-name{font-family:'Playfair Display',serif;font-size:.78rem;font-weight:700;color:var(--ink);line-height:1.2;}
+  .node-years{font-size:.66rem;color:rgba(26,28,20,.5);margin-top:2px;}
+  .node-pending-badge{font-size:.58rem;background:rgba(201,168,76,.2);color:#7a5f1a;padding:2px 6px;border-radius:10px;margin-top:3px;display:inline-block;}
+
+  /* ── UI elements ── */
+  .zoom-controls{position:fixed;bottom:28px;right:28px;z-index:300;display:flex;flex-direction:column;gap:4px;}
+  .zoom-btn{width:38px;height:38px;background:rgba(13,15,10,.88);border:1px solid rgba(201,168,76,.3);color:var(--gold);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;border-radius:2px;}
+  .zoom-btn:hover{background:rgba(201,168,76,.15);border-color:var(--gold);}
+  .instructions{position:fixed;bottom:28px;left:28px;z-index:300;font-size:.68rem;color:rgba(245,240,232,.25);letter-spacing:.05em;line-height:1.9;}
+  #connect-toast{display:none;position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:rgba(201,168,76,.96);color:#0d0f0a;padding:10px 22px;border-radius:3px;font-family:'Crimson Pro',serif;font-size:.88rem;z-index:400;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:90vw;text-align:center;}
+  #empty-state{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;pointer-events:none;gap:12px;}
+  #empty-state h2{font-family:'Playfair Display',serif;font-size:1.8rem;color:rgba(245,240,232,.2);font-style:italic;}
+  #empty-state p{font-size:.85rem;color:rgba(245,240,232,.14);}
+
+  /* Sync indicator */
+  #sync-dot{width:8px;height:8px;border-radius:50%;background:#4a7c59;margin-right:4px;display:inline-block;transition:background .3s;}
+  #sync-dot.syncing{background:var(--gold);animation:pulse .8s infinite;}
+  #sync-dot.error{background:#c0392b;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* Admin panel */
+  .admin-badge{background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);color:var(--gold);font-size:.65rem;padding:2px 8px;border-radius:10px;letter-spacing:.06em;text-transform:uppercase;}
+  .pending-count{background:#c0392b;color:#fff;font-size:.65rem;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;font-family:sans-serif;}
+
+  /* ── Modals ── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:600;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .25s;}
+  .modal-overlay.active{opacity:1;pointer-events:all;}
+  .modal{background:var(--paper);width:520px;max-width:96vw;max-height:92vh;overflow-y:auto;border-radius:4px;box-shadow:0 20px 80px rgba(0,0,0,.8);transform:translateY(16px);transition:transform .25s;}
+  .modal-overlay.active .modal{transform:translateY(0);}
+  .modal-header{padding:20px 24px 16px;border-bottom:1px solid rgba(26,28,20,.1);display:flex;align-items:center;justify-content:space-between;}
+  .modal-header h2{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--ink);}
+  .modal-close{background:none;border:none;font-size:1.4rem;cursor:pointer;color:rgba(26,28,20,.35);transition:color .2s;}
+  .modal-close:hover{color:var(--ink);}
+  .modal-body{padding:20px 24px;}
+  .modal-footer{padding:12px 24px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid rgba(26,28,20,.1);}
+  .form-group{margin-bottom:15px;}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  label{display:block;font-size:.69rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(26,28,20,.5);margin-bottom:5px;}
+  input[type=text],input[type=date],input[type=email],input[type=password],textarea,select{width:100%;padding:9px 11px;border:1px solid rgba(26,28,20,.18);background:rgba(255,255,255,.55);font-family:'Crimson Pro',serif;font-size:.93rem;color:var(--ink);border-radius:2px;transition:border-color .2s;outline:none;}
+  input:focus,textarea:focus,select:focus{border-color:var(--gold);background:#fff;}
+  textarea{resize:vertical;min-height:65px;}
+  .photo-upload{border:2px dashed rgba(26,28,20,.18);border-radius:4px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+  .photo-upload:hover{border-color:var(--gold);}
+  .photo-upload input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .photo-preview{width:72px;height:72px;border-radius:2px;object-fit:cover;margin:0 auto 8px;display:block;}
+  .photo-upload-text{font-size:.76rem;color:rgba(26,28,20,.42);}
+  .detail-photo{width:100%;height:200px;object-fit:cover;display:block;}
+  .detail-photo-ph{width:100%;height:140px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e8e3d8,#d4cfc4);font-size:3rem;}
+  .detail-content{padding:18px 24px;}
+  .detail-name{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--ink);margin-bottom:3px;}
+  .detail-years{font-size:.86rem;color:rgba(26,28,20,.47);margin-bottom:12px;}
+  .detail-desc{font-size:.93rem;color:rgba(26,28,20,.7);line-height:1.65;margin-bottom:16px;}
+  .detail-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .conn-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px;}
+  .conn-opt{padding:10px 12px;border:1px solid rgba(26,28,20,.17);background:rgba(255,255,255,.5);border-radius:3px;cursor:pointer;transition:all .2s;font-family:'Crimson Pro',serif;font-size:.86rem;color:var(--ink);text-align:left;}
+  .conn-opt:hover{border-color:var(--gold);background:rgba(201,168,76,.09);}
+  .conn-icon{font-size:1.1rem;display:block;margin-bottom:3px;}
+  .conn-label{font-weight:600;display:block;font-size:.86rem;}
+  .conn-desc{font-size:.7rem;color:rgba(26,28,20,.44);margin-top:1px;display:block;}
+  .conn-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(26,28,20,.08);gap:10px;}
+  .conn-row-name{font-size:.9rem;color:var(--ink);font-weight:600;}
+  .conn-row-type{font-size:.7rem;color:rgba(26,28,20,.44);margin-top:2px;}
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:3px;}
+
+  /* Users list in admin */
+  .user-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(26,28,20,.08);gap:10px;}
+  .user-row-info{flex:1;}
+  .user-row-email{font-size:.9rem;color:var(--ink);font-weight:600;}
+  .user-row-status{font-size:.72rem;color:rgba(26,28,20,.44);margin-top:2px;}
+  .status-badge{display:inline-block;font-size:.65rem;padding:2px 8px;border-radius:10px;font-family:sans-serif;}
+  .status-approved{background:rgba(74,124,89,.15);color:#2d5a38;}
+  .status-pending{background:rgba(201,168,76,.15);color:#7a5f1a;}
+  .status-admin{background:rgba(74,110,124,.15);color:#2d4a5a;}
+</style>
+</head>
+<body>
+
+<!-- ══ AUTH SCREEN ══ -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-header">
+      <h1>Obiteljsko Stablo</h1>
+      <p>Prijavite se za pristup</p>
+    </div>
+    <div class="auth-body">
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchTab('login')">Prijava</div>
+        <div class="auth-tab" onclick="switchTab('register')">Registracija</div>
+      </div>
+      <div class="auth-error" id="auth-error"></div>
+      <div class="auth-info" id="auth-info"></div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="vas@email.com">
+      </div>
+      <div class="form-group">
+        <label>Lozinka</label>
+        <input type="password" id="auth-password" placeholder="••••••••">
+      </div>
+      <div class="form-group" id="auth-name-group" style="display:none">
+        <label>Vaše ime</label>
+        <input type="text" id="auth-name" placeholder="Ime Prezime">
+      </div>
+    </div>
+    <div class="auth-footer">
+      <button class="btn btn-primary" id="auth-submit-btn" onclick="submitAuth()">Prijavi se</button>
+      <div class="divider">ili</div>
+      <button class="google-btn" onclick="signInGoogle()">
+        <img src="https://www.google.com/favicon.ico" alt="G">
+        Nastavi s Google računom
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PENDING APPROVAL SCREEN ══ -->
+<div id="pending-screen">
+  <div class="pending-box">
+    <div style="font-size:3rem;margin-bottom:16px;">⏳</div>
+    <h2>Čekanje odobrenja</h2>
+    <p>Vaš zahtjev za pristup je poslan administratoru.<br>Bit ćete obaviješteni kad dobijete pristup.</p>
+    <br>
+    <button class="btn" onclick="signOut()" style="margin-top:8px;">Odjava</button>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="app" style="display:none">
+
+<div class="header">
+  <h1>Obiteljsko Stablo</h1>
+  <div class="header-actions">
+    <span><span id="sync-dot"></span></span>
+    <span class="user-badge" id="user-badge"></span>
+    <span id="admin-badge-wrap"></span>
+    <button class="btn" id="connect-btn" onclick="toggleConnectMode()">🔗 Poveži</button>
+    <button class="btn btn-primary" id="add-person-btn" onclick="openAddModal()">+ Dodaj osobu</button>
+    <button class="btn" id="admin-btn" onclick="openAdminPanel()" style="display:none">👑 Admin <span class="pending-count" id="pending-count" style="display:none">0</span></button>
+    <button class="btn" onclick="signOut()">Odjava</button>
+  </div>
+</div>
+
+<svg id="svg-lines" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="canvas"><div id="world"></div></div>
+
+<div id="empty-state">
+  <h2>Vaše obiteljsko stablo</h2>
+  <p>Kliknite "+ Dodaj osobu" da biste počeli</p>
+</div>
+
+<div id="connect-toast"></div>
+
+<div class="zoom-controls">
+  <button class="zoom-btn" onclick="zoom(1.15)">+</button>
+  <button class="zoom-btn" onclick="zoom(0.87)">−</button>
+  <button class="zoom-btn" onclick="resetView()">⌖</button>
+</div>
+<div class="instructions" id="instructions">
+  Klik → detalji | Povuci karticu → premjesti<br>
+  Povuci pozadinu → pomiči | Kotačić → zoom
+</div>
+
+</div><!-- end #app -->
+
+<!-- ══ CONNECTION TYPE MODAL ══ -->
+<div class="modal-overlay" id="conn-type-overlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header"><h2>Vrsta veze</h2><button class="modal-close" onclick="cancelConnection()">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:.83rem;color:rgba(26,28,20,.47);margin-bottom:14px;" id="conn-desc"></p>
+      <div class="conn-grid" id="conn-grid"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="cancelConnection()">Odustani</button></div>
+  </div>
+</div>
+
+<!-- ══ MANAGE CONNECTIONS MODAL ══ -->
+<div class="modal-overlay" id="manage-conn-overlay">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header"><h2>Veze ove osobe</h2><button class="modal-close" onclick="closeModal('manage-conn-overlay')">×</button></div>
+    <div class="modal-body"><div id="manage-conn-list"></div></div>
+  </div>
+</div>
+
+<!-- ══ ADD/EDIT MODAL ══ -->
+<div class="modal-overlay" id="edit-modal-overlay">
+  <div class="modal">
+    <div class="modal-header"><h2 id="edit-title">Nova osoba</h2><button class="modal-close" onclick="closeEditModal()">×</button></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Fotografija</label>
+        <div class="photo-upload">
+          <input type="file" accept="image/*" id="photo-input" onchange="handlePhoto(event)">
+          <img class="photo-preview" id="photo-preview" src="" style="display:none" alt="">
+          <div class="photo-upload-text" id="photo-hint">📷 Kliknite za odabir fotografije</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Ime</label><input type="text" id="f-ime" placeholder="Ime"></div>
+        <div class="form-group"><label>Prezime</label><input type="text" id="f-prez" placeholder="Prezime"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Datum rođenja</label><input type="date" id="f-rod"></div>
+        <div class="form-group"><label>Datum smrti</label><input type="date" id="f-umr"></div>
+      </div>
+      <div class="form-group"><label>Kratki opis</label><textarea id="f-opis" placeholder="Životopis, anegdota..."></textarea></div>
+      <div class="form-group">
+        <label>Boja grane</label>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <input type="color" id="f-color" value="#4a7c59" style="width:42px;height:42px;border:none;background:none;cursor:pointer;padding:0;border-radius:4px;" oninput="selectedColor=this.value;addRecent(this.value)">
+          <div id="recent-colors" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEditModal()">Odustani</button>
+      <button class="btn btn-primary" onclick="savePerson()">Spremi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DETAIL MODAL ══ -->
+<div class="modal-overlay" id="detail-modal-overlay">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header"><h2 id="d-title">Detalji</h2><button class="modal-close" onclick="closeModal('detail-modal-overlay')">×</button></div>
+    <div class="modal-body" style="padding:0;">
+      <div id="d-photo"></div>
+      <div class="detail-content">
+        <div class="detail-name" id="d-name"></div>
+        <div class="detail-years" id="d-years"></div>
+        <div class="detail-desc" id="d-desc"></div>
+        <div class="detail-actions" id="d-actions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN PANEL ══ -->
+<div class="modal-overlay" id="admin-overlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header"><h2>👑 Admin panel</h2><button class="modal-close" onclick="closeModal('admin-overlay')">×</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid rgba(26,28,20,.1);padding-bottom:16px;">
+        <button class="btn active" id="admin-tab-users" onclick="switchAdminTab('users')">Korisnici</button>
+        <button class="btn" id="admin-tab-pending" onclick="switchAdminTab('pending')">Na čekanju</button>
+      </div>
+      <div id="admin-users-panel"></div>
+      <div id="admin-pending-panel" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ══════════════════════════════════════════════════════
+// FIREBASE SETUP
+// ══════════════════════════════════════════════════════
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut as fbSignOut,
+  updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot,
+  addDoc, updateDoc, deleteDoc, query, serverTimestamp, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBtpTyZ-cz1lxrWSAZx0FRh3Tq6O8FIs8U",
+  authDomain: "obiteljsko-stablo-e5d30.firebaseapp.com",
+  projectId: "obiteljsko-stablo-e5d30",
+  storageBucket: "obiteljsko-stablo-e5d30.firebasestorage.app",
+  messagingSenderId: "773898380892",
+  appId: "1:773898380892:web:29e7f50f86c80b148d6899",
+  measurementId: "G-MBR4CWDPPT"
+};
+
+const fbApp  = initializeApp(firebaseConfig);
+const auth   = getAuth(fbApp);
+const db     = getFirestore(fbApp);
+const gProvider = new GoogleAuthProvider();
+
+// ══════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════
+let people={}, relations={}, positions={};
+let selectedColor='#4a7c59';
+let recentColors=['#4a7c59','#7c4a6e','#c9a84c','#4a6e7c','#c05a3a'];
+let editingId=null, currentPhoto=null;
+let panX=0,panY=0,scale=1;
+let isPanning=false,lastPX=0,lastPY=0;
+let connectMode=false,connectFirst=null,connectSecond=null,tempLine=null;
+let currentUser=null, currentUserData=null, isAdmin=false;
+let unsubPeople=null, unsubRelations=null, unsubPositions=null;
+
+const ADMIN_EMAIL = ''; // Will be set to first registered user
+
+const REL={
+  roditelj:   {l:'Roditelj',        ic:'👆',dc:'Prva je roditelj druge',       dash:false},
+  dijete:     {l:'Dijete',          ic:'👶',dc:'Prva je dijete druge',          dash:false},
+  bracni:     {l:'Bračni par',      ic:'💍',dc:'Suprug / supruga',              dash:true},
+  partner:    {l:'Partner',         ic:'💑',dc:'Izvanbračna veza',              dash:true},
+  brat_sestra:{l:'Brat / Sestra',   ic:'🤝',dc:'Braća i sestre',               dash:false},
+  polubrat:   {l:'Polubrat/sestra', ic:'👫',dc:'Jedan zajednički roditelj',     dash:true},
+  djed_baka:  {l:'Djed / Baka',     ic:'👴',dc:'Prva je djed ili baka',        dash:false},
+  unuk:       {l:'Unuk / Unuka',    ic:'🧒',dc:'Prva je unuk/unuka druge',     dash:false},
+  stric_ujak: {l:'Stric/Ujak/Teta',ic:'👨',dc:'Prva je stric, ujak ili teta', dash:false},
+  necak:      {l:'Nećak/Nećakinja',ic:'🧑',dc:'Prva je nećak ili nećakinja',  dash:false},
+  rodak:      {l:'Rođak/Rođakinja', ic:'👪',dc:'Širi obiteljski krug',         dash:true},
+  ostalo:     {l:'Ostalo',          ic:'🔗',dc:'Vlastita definicija',           dash:true},
+};
+
+document.getElementById('conn-grid').innerHTML=Object.entries(REL).map(([k,r])=>
+  `<button class="conn-opt" onclick="confirmConnection('${k}')">
+    <span class="conn-icon">${r.ic}</span>
+    <span class="conn-label">${r.l}</span>
+    <span class="conn-desc">${r.dc}</span>
+  </button>`).join('');
+
+// ══════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════
+let authTab = 'login';
+window.switchTab = (tab) => {
+  authTab=tab;
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='login'?0:1)));
+  document.getElementById('auth-name-group').style.display=tab==='register'?'block':'none';
+  document.getElementById('auth-submit-btn').textContent=tab==='login'?'Prijavi se':'Registriraj se';
+  document.getElementById('auth-error').style.display='none';
+  document.getElementById('auth-info').style.display='none';
+};
+
+window.submitAuth = async () => {
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-password').value;
+  const name=document.getElementById('auth-name').value.trim();
+  const errEl=document.getElementById('auth-error');
+  errEl.style.display='none';
+  if(!email||!pass){errEl.textContent='Unesite email i lozinku.';errEl.style.display='block';return;}
+  try {
+    if(authTab==='login'){
+      await signInWithEmailAndPassword(auth,email,pass);
+    } else {
+      if(!name){errEl.textContent='Unesite vaše ime.';errEl.style.display='block';return;}
+      const cred=await createUserWithEmailAndPassword(auth,email,pass);
+      await updateProfile(cred.user,{displayName:name});
+      await registerUser(cred.user, name);
+      const infoEl=document.getElementById('auth-info');
+      infoEl.textContent='Registracija uspješna! Čekajte odobrenje administratora.';
+      infoEl.style.display='block';
+    }
+  } catch(e){
+    const msgs={
+      'auth/email-already-in-use':'Email je već registriran.',
+      'auth/invalid-email':'Nevažeći email.',
+      'auth/wrong-password':'Pogrešna lozinka.',
+      'auth/user-not-found':'Korisnik nije pronađen.',
+      'auth/weak-password':'Lozinka mora imati najmanje 6 znakova.',
+      'auth/invalid-credential':'Pogrešan email ili lozinka.',
+    };
+    errEl.textContent=msgs[e.code]||e.message;
+    errEl.style.display='block';
+  }
+};
+
+window.signInGoogle = async () => {
+  try {
+    const result=await signInWithPopup(auth,gProvider);
+    const user=result.user;
+    const userDoc=await getDoc(doc(db,'users',user.uid));
+    if(!userDoc.exists()) await registerUser(user, user.displayName||user.email);
+  } catch(e){
+    const errEl=document.getElementById('auth-error');
+    errEl.textContent='Google prijava nije uspjela: '+e.message;
+    errEl.style.display='block';
+  }
+};
+
+async function registerUser(user, displayName) {
+  // Check if this is the first user → make them admin
+  const usersSnap=await getDocs(collection(db,'users'));
+  const isFirst=usersSnap.empty;
+  await setDoc(doc(db,'users',user.uid),{
+    uid: user.uid,
+    email: user.email,
+    displayName,
+    role: isFirst ? 'admin' : 'pending',
+    createdAt: serverTimestamp(),
+  });
+}
+
+window.signOut = async () => {
+  unsubAll();
+  await fbSignOut(auth);
+  people={}; relations={}; positions={};
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('pending-screen').style.display='none';
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if(!user){ showAuthScreen(); return; }
+  currentUser=user;
+  // Load user data
+  const userRef=doc(db,'users',user.uid);
+  const userDoc=await getDoc(userRef);
+  if(!userDoc.exists()){
+    await registerUser(user, user.displayName||user.email);
+    showPendingScreen(); return;
+  }
+  currentUserData=userDoc.data();
+  const role=currentUserData.role;
+  if(role==='pending'){ showPendingScreen(); return; }
+  isAdmin=(role==='admin');
+  showApp();
+});
+
+function showAuthScreen(){
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('pending-screen').style.display='none';
+  document.getElementById('app').style.display='none';
+}
+function showPendingScreen(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('pending-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+function showApp(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('pending-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('user-badge').textContent=currentUser.displayName||currentUser.email;
+  if(isAdmin){
+    document.getElementById('admin-btn').style.display='block';
+    document.getElementById('admin-badge-wrap').innerHTML='<span class="admin-badge">Admin</span>';
+  }
+  startListeners();
+}
+
+// ══════════════════════════════════════════════════════
+// FIRESTORE REAL-TIME LISTENERS
+// ══════════════════════════════════════════════════════
+function unsubAll(){ if(unsubPeople)unsubPeople(); if(unsubRelations)unsubRelations(); if(unsubPositions)unsubPositions(); }
+
+function setSyncing(state){ // 'ok','syncing','error'
+  const dot=document.getElementById('sync-dot');
+  dot.className=''; dot.classList.add(state==='syncing'?'syncing':state==='error'?'error':'');
+}
+
+function startListeners(){
+  setSyncing('syncing');
+
+  // People
+  unsubPeople=onSnapshot(collection(db,'people'), snap=>{
+    people={};
+    snap.forEach(d=>{ people[d.id]={id:d.id,...d.data()}; });
+    render(); setSyncing('ok');
+    if(isAdmin) checkPendingCount();
+  }, ()=>setSyncing('error'));
+
+  // Relations
+  unsubRelations=onSnapshot(collection(db,'relations'), snap=>{
+    relations={};
+    snap.forEach(d=>{ relations[d.id]={id:d.id,...d.data()}; });
+    redrawLines();
+  });
+
+  // Positions
+  unsubPositions=onSnapshot(collection(db,'positions'), snap=>{
+    snap.forEach(d=>{ positions[d.id]={...d.data()}; });
+    render();
+  });
+}
+
+async function checkPendingCount(){
+  const snap=await getDocs(collection(db,'users'));
+  let cnt=0;
+  snap.forEach(d=>{ if(d.data().role==='pending')cnt++; });
+  const el=document.getElementById('pending-count');
+  if(cnt>0){el.textContent=cnt;el.style.display='inline-flex';}
+  else el.style.display='none';
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+const W=()=>window.innerWidth, H=()=>window.innerHeight;
+function fy(d){if(!d)return'';return new Date(d+'T00:00:00').getFullYear();}
+function yrs(p){const b=fy(p.rodjen),d=fy(p.umro);if(!b&&!d)return'';if(b&&!d)return`* ${b}`;if(!b&&d)return`† ${d}`;return`${b} – ${d}`;}
+function ws(x,y){return{x:x*scale+panX,y:y*scale+panY};}
+function setSave(state){ // visual sync dot for saves
+  setSyncing(state==='saving'?'syncing':'ok');
+}
+
+// ══════════════════════════════════════════════════════
+// PAN & ZOOM
+// ══════════════════════════════════════════════════════
+const canvas=document.getElementById('canvas');
+const world=document.getElementById('world');
+canvas.addEventListener('mousedown',e=>{if(e.target.closest('.node'))return;isPanning=true;lastPX=e.clientX;lastPY=e.clientY;});
+window.addEventListener('mousemove',e=>{if(!isPanning)return;panX+=e.clientX-lastPX;panY+=e.clientY-lastPY;lastPX=e.clientX;lastPY=e.clientY;applyT();redrawLines();});
+window.addEventListener('mouseup',()=>{isPanning=false;});
+canvas.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.1:.91;panX=e.clientX-f*(e.clientX-panX);panY=e.clientY-f*(e.clientY-panY);scale=Math.max(.15,Math.min(4,scale*f));applyT();redrawLines();},{passive:false});
+let lastTD=null;
+canvas.addEventListener('touchstart',e=>{if(e.touches.length===1&&!e.target.closest('.node')){isPanning=true;lastPX=e.touches[0].clientX;lastPY=e.touches[0].clientY;}},{passive:true});
+canvas.addEventListener('touchmove',e=>{if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(lastTD){scale=Math.max(.15,Math.min(4,scale*(d/lastTD)));applyT();redrawLines();}lastTD=d;}else if(isPanning&&e.touches.length===1){panX+=e.touches[0].clientX-lastPX;panY+=e.touches[0].clientY-lastPY;lastPX=e.touches[0].clientX;lastPY=e.touches[0].clientY;applyT();redrawLines();}e.preventDefault();},{passive:false});
+canvas.addEventListener('touchend',()=>{isPanning=false;lastTD=null;});
+function applyT(){world.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`;}
+window.zoom=f=>{panX=W()/2-f*(W()/2-panX);panY=H()/2-f*(H()/2-panY);scale=Math.max(.15,Math.min(4,scale*f));applyT();redrawLines();};
+window.resetView=()=>{const ids=Object.keys(positions);if(!ids.length){panX=0;panY=0;scale=1;applyT();redrawLines();return;}const xs=ids.map(i=>positions[i].x),ys=ids.map(i=>positions[i].y);const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;scale=1;panX=W()/2-cx*scale;panY=H()/2-cy*scale;applyT();redrawLines();};
+
+// ══════════════════════════════════════════════════════
+// SVG LINES
+// ══════════════════════════════════════════════════════
+function redrawLines(){
+  const svg=document.getElementById('svg-lines');
+  let h='';
+  Object.values(relations).forEach(rel=>{
+    const pa=positions[rel.from],pb=positions[rel.to];
+    if(!pa||!pb)return;
+    const a=ws(pa.x,pa.y),b=ws(pb.x,pb.y);
+    const fromPerson=people[rel.from];
+    const color=fromPerson?.color||'#c9a84c';
+    const ri=REL[rel.type]||REL.ostalo;
+    const dash=ri.dash?'stroke-dasharray="9 5"':'';
+    const cx=(a.x+b.x)/2,cy=(a.y+b.y)/2-Math.max(30,Math.abs(b.y-a.y)*.3);
+    h+=`<path d="M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}" fill="none" stroke="${color}" stroke-width="3" ${dash} opacity="0.88" stroke-linecap="round"/>`;
+    const mx=(a.x+2*cx+b.x)/4,my=(a.y+2*cy+b.y)/4;
+    h+=`<circle cx="${mx}" cy="${my}" r="4" fill="${color}" opacity=".75"/>`;
+    h+=`<text x="${mx+8}" y="${my+4}" font-size="10" fill="${color}" opacity=".65" font-family="serif" font-style="italic">${ri.l}</text>`;
+  });
+  svg.innerHTML=h;
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════
+const NW=150,NH=140;
+function render(){
+  const w=document.getElementById('world');
+  const es=document.getElementById('empty-state');
+  const has=Object.keys(people).length>0;
+  es.style.display=has?'none':'flex';
+  if(!has){w.innerHTML='';redrawLines();return;}
+  autoPlace();
+  w.innerHTML='';
+  Object.values(people).forEach(p=>{
+    const pos=positions[p.id];if(!pos)return;
+    const node=document.createElement('div');
+    node.className='node';node.dataset.id=p.id;
+    node.style.left=pos.x+'px';node.style.top=pos.y+'px';
+    const yr=yrs(p);
+    const isPending=p.status==='pending';
+    node.innerHTML=`<div class="node-card${isPending?' pending-card':''}" data-id="${p.id}">
+      <div class="node-color-bar" style="background:${p.color||'#4a7c59'}"></div>
+      ${p.photo?`<img class="node-photo" src="${p.photo}" alt="">`:`<div class="node-photo-ph">👤</div>`}
+      <div class="node-info">
+        <div class="node-name">${p.ime||''} ${p.prez||''}</div>
+        ${yr?`<div class="node-years">${yr}</div>`:''}
+        ${isPending?`<span class="node-pending-badge">⏳ Na čekanju</span>`:''}
+      </div></div>`;
+    attachDrag(node,p.id);
+    w.appendChild(node);
+  });
+  redrawLines();
+}
+
+function autoPlace(){
+  const unpl=Object.keys(people).filter(id=>!positions[id]);
+  if(!unpl.length)return;
+  const placed=Object.keys(positions).length;
+  const cols=Math.max(3,Math.ceil(Math.sqrt(placed+unpl.length)));
+  unpl.forEach(async(id,i)=>{
+    const col=(placed+i)%cols;
+    const row=Math.floor((placed+i)/cols);
+    const pos={x:200+col*(NW+70),y:150+row*(NH+90)};
+    positions[id]=pos;
+    await setDoc(doc(db,'positions',id),pos);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// DRAG
+// ══════════════════════════════════════════════════════
+function attachDrag(node,id){
+  let sx,sy,wx0,wy0,moved,saveTimer;
+  const start=(cx,cy)=>{sx=cx;sy=cy;wx0=positions[id]?.x||0;wy0=positions[id]?.y||0;moved=false;node.style.zIndex=50;};
+  const move=(cx,cy)=>{
+    const dx=(cx-sx)/scale,dy=(cy-sy)/scale;
+    if(Math.abs(dx)>4||Math.abs(dy)>4)moved=true;
+    if(!moved)return;
+    positions[id]={x:wx0+dx,y:wy0+dy};
+    node.style.left=positions[id].x+'px';node.style.top=positions[id].y+'px';
+    redrawLines();
+    if(connectMode&&connectFirst&&tempLine)updateTemp(cx,cy);
+  };
+  const end=(cx,cy)=>{
+    node.style.zIndex='';
+    if(!moved){
+      if(connectMode)handleConnect(id);
+      else openDetail(id);
+    } else {
+      // Save position to Firestore (debounced)
+      clearTimeout(saveTimer);
+      saveTimer=setTimeout(async()=>{
+        await setDoc(doc(db,'positions',id),positions[id]);
+      },800);
+    }
+  };
+  node.addEventListener('mousedown',e=>{e.stopPropagation();start(e.clientX,e.clientY);});
+  const mm=e=>move(e.clientX,e.clientY);
+  const mu=e=>{window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu);end(e.clientX,e.clientY);};
+  node.addEventListener('mousedown',()=>{window.addEventListener('mousemove',mm);window.addEventListener('mouseup',mu);});
+  node.addEventListener('touchstart',e=>{e.stopPropagation();const t=e.touches[0];start(t.clientX,t.clientY);},{passive:true});
+  node.addEventListener('touchmove',e=>{const t=e.touches[0];move(t.clientX,t.clientY);},{passive:true});
+  node.addEventListener('touchend',e=>{const t=e.changedTouches[0];end(t.clientX,t.clientY);});
+}
+
+// ══════════════════════════════════════════════════════
+// CONNECT MODE
+// ══════════════════════════════════════════════════════
+window.toggleConnectMode=()=>{
+  connectMode=!connectMode;connectFirst=null;connectSecond=null;
+  document.body.classList.toggle('connect-mode',connectMode);
+  document.getElementById('connect-btn').classList.toggle('active',connectMode);
+  document.getElementById('instructions').style.display=connectMode?'none':'block';
+  const t=document.getElementById('connect-toast');
+  if(connectMode){t.style.display='block';t.innerHTML='Kliknite <strong>prvu osobu</strong> — <em>Esc</em> za odustajanje';}
+  else t.style.display='none';
+  clearHL();removeTL();
+};
+function exitConnect(){
+  connectMode=false;connectFirst=null;connectSecond=null;
+  document.body.classList.remove('connect-mode');
+  document.getElementById('connect-btn').classList.remove('active');
+  document.getElementById('connect-toast').style.display='none';
+  document.getElementById('instructions').style.display='block';
+  clearHL();removeTL();
+}
+function handleConnect(id){
+  if(!connectFirst){
+    connectFirst=id;
+    document.querySelector(`.node[data-id="${id}"] .node-card`)?.classList.add('connect-selected');
+    document.getElementById('connect-toast').innerHTML=`<strong>${people[id]?.ime||''} ${people[id]?.prez||''}</strong> odabran/a — kliknite <strong>drugu osobu</strong> · <em>Esc</em> odustani`;
+    startTL(id);
+  } else if(connectFirst===id){
+    clearHL();connectFirst=null;removeTL();
+    document.getElementById('connect-toast').innerHTML='Kliknite <strong>prvu osobu</strong> — <em>Esc</em> za odustajanje';
+  } else {
+    connectSecond=id;
+    const p1=people[connectFirst],p2=people[id];
+    document.getElementById('conn-desc').textContent=`${p1?.ime||''} ${p1?.prez||''}  ↔  ${p2?.ime||''} ${p2?.prez||''}`;
+    document.getElementById('conn-type-overlay').classList.add('active');
+    removeTL();
+  }
+}
+window.confirmConnection=async(type)=>{
+  if(!connectFirst||!connectSecond)return;
+  const exists=Object.values(relations).some(r=>(r.from===connectFirst&&r.to===connectSecond)||(r.from===connectSecond&&r.to===connectFirst));
+  if(!exists){
+    setSyncing('syncing');
+    await addDoc(collection(db,'relations'),{from:connectFirst,to:connectSecond,type,createdBy:currentUser.uid,createdAt:serverTimestamp()});
+    setSyncing('ok');
+  }
+  closeModal('conn-type-overlay');exitConnect();
+};
+window.cancelConnection=()=>{
+  closeModal('conn-type-overlay');connectSecond=null;
+  if(connectFirst){startTL(connectFirst);document.getElementById('connect-toast').innerHTML=`<strong>${people[connectFirst]?.ime||''} ${people[connectFirst]?.prez||''}</strong> odabran/a — kliknite <strong>drugu osobu</strong> · <em>Esc</em> odustani`;}
+};
+function startTL(fromId){
+  removeTL();
+  const svg=document.getElementById('svg-lines');
+  const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+  l.setAttribute('stroke','#c9a84c');l.setAttribute('stroke-width','2.5');l.setAttribute('stroke-dasharray','10 5');l.setAttribute('opacity','.85');l.setAttribute('stroke-linecap','round');l.id='tl';svg.appendChild(l);tempLine=l;
+  const mv=e=>updateTemp(e.clientX,e.clientY);window._tlmv=mv;window.addEventListener('mousemove',mv);
+}
+function updateTemp(cx,cy){
+  if(!tempLine||!connectFirst)return;
+  const pos=positions[connectFirst];if(!pos)return;
+  const s=ws(pos.x,pos.y);
+  tempLine.setAttribute('x1',s.x);tempLine.setAttribute('y1',s.y);tempLine.setAttribute('x2',cx);tempLine.setAttribute('y2',cy);
+}
+function removeTL(){if(tempLine){tempLine.remove();tempLine=null;}if(window._tlmv){window.removeEventListener('mousemove',window._tlmv);window._tlmv=null;}}
+function clearHL(){document.querySelectorAll('.connect-selected').forEach(e=>e.classList.remove('connect-selected'));}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.getElementById('conn-type-overlay').classList.contains('active'))cancelConnection();else if(connectMode)exitConnect();}});
+
+// ══════════════════════════════════════════════════════
+// MANAGE CONNECTIONS
+// ══════════════════════════════════════════════════════
+window.openManageConn=async(id)=>{
+  const myRels=Object.values(relations).filter(r=>r.from===id||r.to===id);
+  const list=document.getElementById('manage-conn-list');
+  if(!myRels.length){list.innerHTML='<p style="font-size:.88rem;color:rgba(26,28,20,.45);">Ova osoba nema veza.</p>';}
+  else{list.innerHTML=myRels.map(rel=>{
+    const oid=rel.from===id?rel.to:rel.from;
+    const o=people[oid];if(!o)return'';
+    const lbl=(REL[rel.type]||REL.ostalo).l;
+    const canDel=isAdmin||(rel.createdBy===currentUser.uid);
+    return`<div class="conn-row">
+      <div><div class="conn-row-name">${o.ime||''} ${o.prez||''}</div><div class="conn-row-type">${lbl}</div></div>
+      ${canDel?`<button class="btn btn-danger" style="padding:4px 10px;font-size:.7rem;" onclick="delRel('${rel.id}')">Obriši</button>`:''}
+    </div>`;
+  }).join('');}
+  closeModal('detail-modal-overlay');
+  document.getElementById('manage-conn-overlay').classList.add('active');
+};
+window.delRel=async(rid)=>{
+  setSyncing('syncing');
+  await deleteDoc(doc(db,'relations',rid));
+  setSyncing('ok');
+  closeModal('manage-conn-overlay');
+};
+
+// ══════════════════════════════════════════════════════
+// MODALS
+// ══════════════════════════════════════════════════════
+window.closeModal=id=>document.getElementById(id).classList.remove('active');
+document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');});});
+
+window.openAddModal=()=>{
+  editingId=null;currentPhoto=null;
+  document.getElementById('edit-title').textContent='Nova osoba';
+  ['f-ime','f-prez','f-opis'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('f-rod').value='';document.getElementById('f-umr').value='';
+  document.getElementById('photo-preview').style.display='none';
+  document.getElementById('photo-hint').textContent='📷 Kliknite za odabir fotografije';
+  setCP('#4a7c59');
+  document.getElementById('edit-modal-overlay').classList.add('active');
+};
+
+window.openEditModal=id=>{
+  editingId=id;const p=people[id];currentPhoto=p.photo||null;
+  document.getElementById('edit-title').textContent='Uredi osobu';
+  document.getElementById('f-ime').value=p.ime||'';document.getElementById('f-prez').value=p.prez||'';
+  document.getElementById('f-rod').value=p.rodjen||'';document.getElementById('f-umr').value=p.umro||'';
+  document.getElementById('f-opis').value=p.opis||'';
+  if(p.photo){document.getElementById('photo-preview').src=p.photo;document.getElementById('photo-preview').style.display='block';document.getElementById('photo-hint').textContent='Kliknite za promjenu';}
+  else{document.getElementById('photo-preview').style.display='none';document.getElementById('photo-hint').textContent='📷 Kliknite za odabir fotografije';}
+  setCP(p.color||'#4a7c59');
+  closeModal('detail-modal-overlay');
+  document.getElementById('edit-modal-overlay').classList.add('active');
+};
+window.closeEditModal=()=>{closeModal('edit-modal-overlay');editingId=null;};
+
+window.savePerson=async()=>{
+  const ime=document.getElementById('f-ime').value.trim();
+  const prez=document.getElementById('f-prez').value.trim();
+  if(!ime&&!prez){alert('Unesite bar ime ili prezime.');return;}
+  const data={
+    ime,prez,
+    rodjen:document.getElementById('f-rod').value,
+    umro:document.getElementById('f-umr').value,
+    opis:document.getElementById('f-opis').value,
+    photo:currentPhoto||null,
+    color:selectedColor,
+    updatedBy:currentUser.uid,
+    updatedAt:serverTimestamp(),
+  };
+  setSyncing('syncing');
+  if(editingId){
+    // Non-admins create pending edit
+    if(!isAdmin){
+      data.status='pending';data.originalId=editingId;
+      await addDoc(collection(db,'pending_edits'),{...data,type:'edit',createdBy:currentUser.uid,createdAt:serverTimestamp()});
+      alert('Izmjena je poslana na odobrenje administratoru.');
+    } else {
+      await updateDoc(doc(db,'people',editingId),{...data,status:'approved'});
+    }
+  } else {
+    if(!isAdmin){
+      data.status='pending';data.createdBy=currentUser.uid;data.createdAt=serverTimestamp();
+      await addDoc(collection(db,'people'),data);
+    } else {
+      data.status='approved';data.createdBy=currentUser.uid;data.createdAt=serverTimestamp();
+      await addDoc(collection(db,'people'),data);
+    }
+  }
+  setSyncing('ok');
+  closeModal('edit-modal-overlay');editingId=null;
+};
+
+window.openDetail=id=>{
+  const p=people[id];
+  document.getElementById('d-title').textContent=`${p.ime||''} ${p.prez||''}`;
+  document.getElementById('d-name').textContent=`${p.ime||''} ${p.prez||''}`;
+  document.getElementById('d-years').textContent=yrs(p);
+  document.getElementById('d-desc').textContent=p.opis||'';
+  document.getElementById('d-photo').innerHTML=p.photo?`<img class="detail-photo" src="${p.photo}" alt="">`:`<div class="detail-photo-ph">👤</div>`;
+  const canEdit=isAdmin||(p.createdBy===currentUser.uid);
+  const canDel=isAdmin;
+  document.getElementById('d-actions').innerHTML=
+    (canEdit?`<button class="btn btn-primary" onclick="openEditModal('${id}')">✏️ Uredi</button>`:'')
+    +`<button class="btn" onclick="openManageConn('${id}')">🔗 Veze</button>`
+    +(canDel?`<button class="btn btn-danger" onclick="delPerson('${id}')">🗑 Obriši</button>`:'');
+  document.getElementById('detail-modal-overlay').classList.add('active');
+};
+
+window.delPerson=async(id)=>{
+  if(!isAdmin){alert('Samo admin može brisati osobe.');return;}
+  if(!confirm('Obrisati ovu osobu i sve njene veze?'))return;
+  setSyncing('syncing');
+  await deleteDoc(doc(db,'people',id));
+  await deleteDoc(doc(db,'positions',id));
+  const relSnap=await getDocs(collection(db,'relations'));
+  const dels=[];relSnap.forEach(d=>{if(d.data().from===id||d.data().to===id)dels.push(deleteDoc(d.ref));});
+  await Promise.all(dels);
+  setSyncing('ok');closeModal('detail-modal-overlay');
+};
+
+// ══════════════════════════════════════════════════════
+// ADMIN PANEL
+// ══════════════════════════════════════════════════════
+window.openAdminPanel=async()=>{
+  await loadAdminUsers();
+  document.getElementById('admin-overlay').classList.add('active');
+};
+
+window.switchAdminTab=tab=>{
+  ['users','pending'].forEach(t=>{
+    document.getElementById(`admin-tab-${t}`).classList.toggle('active',t===tab);
+    document.getElementById(`admin-${t}-panel`).style.display=t===tab?'block':'none';
+  });
+  if(tab==='pending')loadPendingPeople();
+};
+
+async function loadAdminUsers(){
+  const snap=await getDocs(collection(db,'users'));
+  const panel=document.getElementById('admin-users-panel');
+  let html='';
+  snap.forEach(d=>{
+    const u=d.data();
+    const roleBadge=u.role==='admin'?'<span class="status-badge status-admin">Admin</span>':
+      u.role==='pending'?'<span class="status-badge status-pending">Na čekanju</span>':
+      '<span class="status-badge status-approved">Odobren</span>';
+    html+=`<div class="user-row">
+      <div class="user-row-info">
+        <div class="user-row-email">${u.displayName||'—'} <small style="font-weight:400;color:rgba(26,28,20,.45)">${u.email}</small></div>
+        <div class="user-row-status">${roleBadge}</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        ${u.role==='pending'?`<button class="btn btn-primary" style="padding:4px 10px;font-size:.72rem;" onclick="approveUser('${d.id}')">Odobri</button>`:''}
+        ${u.role!=='admin'?`<button class="btn btn-danger" style="padding:4px 10px;font-size:.72rem;" onclick="removeUser('${d.id}')">Ukloni</button>`:''}
+      </div>
+    </div>`;
+  });
+  panel.innerHTML=html||'<p style="font-size:.88rem;color:rgba(26,28,20,.45);">Nema korisnika.</p>';
+}
+
+async function loadPendingPeople(){
+  const snap=await getDocs(collection(db,'people'));
+  const panel=document.getElementById('admin-pending-panel');
+  let html='';
+  snap.forEach(d=>{
+    const p=d.data();
+    if(p.status!=='pending')return;
+    html+=`<div class="user-row">
+      <div class="user-row-info">
+        <div class="user-row-email">${p.ime||''} ${p.prez||''}</div>
+        <div class="user-row-status">Dodao/la: ${p.createdBy||'—'}</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-primary" style="padding:4px 10px;font-size:.72rem;" onclick="approvePerson('${d.id}')">Odobri</button>
+        <button class="btn btn-danger" style="padding:4px 10px;font-size:.72rem;" onclick="rejectPerson('${d.id}')">Odbaci</button>
+      </div>
+    </div>`;
+  });
+  panel.innerHTML=html||'<p style="font-size:.88rem;color:rgba(26,28,20,.45);">Nema stavki na čekanju.</p>';
+}
+
+window.approveUser=async(uid)=>{
+  await updateDoc(doc(db,'users',uid),{role:'member'});
+  await loadAdminUsers();checkPendingCount();
+};
+window.removeUser=async(uid)=>{
+  if(!confirm('Ukloniti ovog korisnika?'))return;
+  await deleteDoc(doc(db,'users',uid));
+  await loadAdminUsers();
+};
+window.approvePerson=async(id)=>{
+  await updateDoc(doc(db,'people',id),{status:'approved'});
+  await loadPendingPeople();checkPendingCount();
+};
+window.rejectPerson=async(id)=>{
+  await deleteDoc(doc(db,'people',id));
+  await loadPendingPeople();checkPendingCount();
+};
+
+// ══════════════════════════════════════════════════════
+// PHOTO & COLOR
+// ══════════════════════════════════════════════════════
+window.handlePhoto=e=>{
+  const f=e.target.files[0];if(!f)return;
+  // Resize before storing as base64
+  const img=new Image();
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const MAX=600;
+      let w=img.width,h=img.height;
+      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      currentPhoto=canvas.toDataURL('image/jpeg',.75);
+      document.getElementById('photo-preview').src=currentPhoto;
+      document.getElementById('photo-preview').style.display='block';
+      document.getElementById('photo-hint').textContent='Kliknite za promjenu';
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(f);
+};
+
+window.addRecent=c=>{recentColors=[c,...recentColors.filter(x=>x!==c)].slice(0,8);renderRC();};
+function renderRC(){
+  const el=document.getElementById('recent-colors');if(!el)return;
+  el.innerHTML=recentColors.map(c=>`<div onclick="pickRC('${c}')" title="${c}" style="width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${c===selectedColor?'white':'transparent'};box-shadow:0 0 0 1px rgba(0,0,0,.3);transition:transform .15s;" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'"></div>`).join('');
+}
+window.pickRC=c=>{selectedColor=c;document.getElementById('f-color').value=c;renderRC();};
+function setCP(c){selectedColor=c;const el=document.getElementById('f-color');if(el)el.value=c;setTimeout(renderRC,30);}
+
+window.addEventListener('resize',()=>redrawLines());
+</script>
+</body>
+</html>
