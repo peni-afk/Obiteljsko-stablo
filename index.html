@@ -132,6 +132,27 @@
   .conn-row-type{font-size:.7rem;color:rgba(26,28,20,.44);margin-top:2px;}
   ::-webkit-scrollbar{width:5px;}
   ::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:3px;}
+  /* Gallery */
+  .gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
+  .gallery-item{position:relative;border-radius:3px;overflow:hidden;aspect-ratio:1;cursor:pointer;border:2px solid transparent;transition:all .2s;}
+  .gallery-item:hover{border-color:var(--gold);}
+  .gallery-item.is-cover{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,168,76,.4);}
+  .gallery-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .gallery-cover-badge{position:absolute;bottom:4px;left:4px;background:var(--gold);color:var(--bg);font-size:.58rem;padding:2px 6px;border-radius:8px;font-family:sans-serif;font-weight:700;letter-spacing:.04em;}
+  .gallery-del{position:absolute;top:3px;right:3px;background:rgba(192,57,43,.85);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.75rem;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;}
+  .gallery-item:hover .gallery-del{display:flex;}
+  .gallery-add{border:2px dashed rgba(26,28,20,.2);border-radius:3px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;position:relative;background:rgba(255,255,255,.3);}
+  .gallery-add:hover{border-color:var(--gold);background:rgba(201,168,76,.06);}
+  .gallery-add input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .gallery-add-icon{font-size:1.4rem;color:rgba(26,28,20,.3);margin-bottom:3px;}
+  .gallery-add-text{font-size:.68rem;color:rgba(26,28,20,.35);text-align:center;}
+  /* Detail gallery */
+  .detail-gallery{display:flex;gap:6px;padding:10px 24px;overflow-x:auto;background:rgba(26,28,20,.04);}
+  .detail-gallery-item{flex-shrink:0;width:72px;height:72px;border-radius:3px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:all .2s;position:relative;}
+  .detail-gallery-item:hover{border-color:var(--gold);}
+  .detail-gallery-item.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,168,76,.35);}
+  .detail-gallery-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .detail-main-photo{width:100%;height:220px;object-fit:cover;display:block;transition:opacity .2s;}
 
   /* Users list in admin */
   .user-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(26,28,20,.08);gap:10px;}
@@ -252,11 +273,17 @@
     <div class="modal-header"><h2 id="edit-title">Nova osoba</h2><button class="modal-close" onclick="closeEditModal()">×</button></div>
     <div class="modal-body">
       <div class="form-group">
-        <label>Fotografija</label>
-        <div class="photo-upload">
-          <input type="file" accept="image/*" id="photo-input" onchange="handlePhoto(event)">
-          <img class="photo-preview" id="photo-preview" src="" style="display:none" alt="">
-          <div class="photo-upload-text" id="photo-hint">📷 Kliknite za odabir fotografije</div>
+        <label>Fotografije <span style="font-weight:400;text-transform:none;font-size:.75rem;color:rgba(26,28,20,.4);">(kliknite za naslovnu)</span></label>
+        <div class="gallery-grid" id="edit-gallery-grid">
+          <div class="gallery-add" id="gallery-add-btn">
+            <input type="file" accept="image/*" multiple id="photo-input" onchange="handlePhotos(event)">
+            <div class="gallery-add-icon">📷</div>
+            <div class="gallery-add-text">Dodaj sliku</div>
+          </div>
+        </div>
+        <div id="upload-progress" style="display:none;margin-top:8px;font-size:.76rem;color:rgba(26,28,20,.5);">⏳ Uploadanje...</div>
+        <div id="cloudinary-notice" style="display:none;margin-top:6px;font-size:.72rem;color:rgba(74,124,89,.8);background:rgba(74,124,89,.08);padding:6px 10px;border-radius:3px;">
+          ☁️ Slike se čuvaju na Cloudinary oblaku
         </div>
       </div>
       <div class="form-row">
@@ -357,6 +384,7 @@ const gProvider = new GoogleAuthProvider();
 // ══════════════════════════════════════════════════════
 let people={}, relations={}, positions={};
 let selectedColor='#4a7c59';
+let currentPhoto=null; // legacy
 let recentColors=['#4a7c59','#7c4a6e','#c9a84c','#4a6e7c','#c05a3a'];
 let editingId=null, currentPhoto=null;
 let panX=0,panY=0,scale=1;
@@ -450,13 +478,22 @@ window.signOut = async () => {
 onAuthStateChanged(auth, async (user) => {
   if(!user){ showAuthScreen(); return; }
   currentUser=user;
-  // Load user data
   const userRef=doc(db,'users',user.uid);
-  const userDoc=await getDoc(userRef);
+  let userDoc=await getDoc(userRef);
+
+  // Retry once after short delay — adminCreateUser may still be writing
   if(!userDoc.exists()){
-    await registerUser(user, user.displayName||user.email);
-    showPendingScreen(); return;
+    await new Promise(r=>setTimeout(r,1500));
+    userDoc=await getDoc(userRef);
   }
+
+  if(!userDoc.exists()){
+    // No record at all — self-registered via Google or direct Firebase console
+    // First user becomes admin, rest become pending
+    await registerUser(user, user.displayName||user.email);
+    userDoc=await getDoc(userRef);
+  }
+
   currentUserData=userDoc.data();
   const role=currentUserData.role;
   if(role==='pending'){ showPendingScreen(); return; }
@@ -558,13 +595,13 @@ const world=document.getElementById('world');
 canvas.addEventListener('mousedown',e=>{if(e.target.closest('.node'))return;isPanning=true;lastPX=e.clientX;lastPY=e.clientY;});
 window.addEventListener('mousemove',e=>{if(!isPanning)return;panX+=e.clientX-lastPX;panY+=e.clientY-lastPY;lastPX=e.clientX;lastPY=e.clientY;applyT();redrawLines();});
 window.addEventListener('mouseup',()=>{isPanning=false;});
-canvas.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.1:.91;panX=e.clientX-f*(e.clientX-panX);panY=e.clientY-f*(e.clientY-panY);scale=Math.max(.15,Math.min(4,scale*f));applyT();redrawLines();},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.1:.91;panX=e.clientX-f*(e.clientX-panX);panY=e.clientY-f*(e.clientY-panY);scale=Math.max(.03,Math.min(4,scale*f));applyT();redrawLines();},{passive:false});
 let lastTD=null;
 canvas.addEventListener('touchstart',e=>{if(e.touches.length===1&&!e.target.closest('.node')){isPanning=true;lastPX=e.touches[0].clientX;lastPY=e.touches[0].clientY;}},{passive:true});
-canvas.addEventListener('touchmove',e=>{if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(lastTD){scale=Math.max(.15,Math.min(4,scale*(d/lastTD)));applyT();redrawLines();}lastTD=d;}else if(isPanning&&e.touches.length===1){panX+=e.touches[0].clientX-lastPX;panY+=e.touches[0].clientY-lastPY;lastPX=e.touches[0].clientX;lastPY=e.touches[0].clientY;applyT();redrawLines();}e.preventDefault();},{passive:false});
+canvas.addEventListener('touchmove',e=>{if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(lastTD){scale=Math.max(.03,Math.min(4,scale*(d/lastTD)));applyT();redrawLines();}lastTD=d;}else if(isPanning&&e.touches.length===1){panX+=e.touches[0].clientX-lastPX;panY+=e.touches[0].clientY-lastPY;lastPX=e.touches[0].clientX;lastPY=e.touches[0].clientY;applyT();redrawLines();}e.preventDefault();},{passive:false});
 canvas.addEventListener('touchend',()=>{isPanning=false;lastTD=null;});
 function applyT(){world.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`;}
-window.zoom=f=>{panX=W()/2-f*(W()/2-panX);panY=H()/2-f*(H()/2-panY);scale=Math.max(.15,Math.min(4,scale*f));applyT();redrawLines();};
+window.zoom=f=>{panX=W()/2-f*(W()/2-panX);panY=H()/2-f*(H()/2-panY);scale=Math.max(.03,Math.min(4,scale*f));applyT();redrawLines();};
 window.resetView=()=>{const ids=Object.keys(positions);if(!ids.length){panX=0;panY=0;scale=1;applyT();redrawLines();return;}const xs=ids.map(i=>positions[i].x),ys=ids.map(i=>positions[i].y);const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;scale=1;panX=W()/2-cx*scale;panY=H()/2-cy*scale;applyT();redrawLines();};
 
 // ══════════════════════════════════════════════════════
@@ -777,25 +814,26 @@ window.closeModal=id=>document.getElementById(id).classList.remove('active');
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');});});
 
 window.openAddModal=()=>{
-  editingId=null;currentPhoto=null;
+  editingId=null; currentPhotos=[]; coverIndex=0;
   document.getElementById('edit-title').textContent='Nova osoba';
   ['f-ime','f-prez','f-opis'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('f-rod').value='';document.getElementById('f-umr').value='';
-  document.getElementById('photo-preview').style.display='none';
-  document.getElementById('photo-hint').textContent='📷 Kliknite za odabir fotografije';
+  document.getElementById('f-rod').value=''; document.getElementById('f-umr').value='';
   setCP('#4a7c59');
+  renderEditGallery();
   document.getElementById('edit-modal-overlay').classList.add('active');
 };
 
 window.openEditModal=id=>{
-  editingId=id;const p=people[id];currentPhoto=p.photo||null;
+  editingId=id; const p=people[id];
+  // Load existing photos — support both old (single photo) and new (array) format
+  currentPhotos = p.photos ? [...p.photos] : (p.photo ? [{data:p.photo}] : []);
+  coverIndex = p.coverIndex||0;
   document.getElementById('edit-title').textContent='Uredi osobu';
-  document.getElementById('f-ime').value=p.ime||'';document.getElementById('f-prez').value=p.prez||'';
-  document.getElementById('f-rod').value=p.rodjen||'';document.getElementById('f-umr').value=p.umro||'';
+  document.getElementById('f-ime').value=p.ime||''; document.getElementById('f-prez').value=p.prez||'';
+  document.getElementById('f-rod').value=p.rodjen||''; document.getElementById('f-umr').value=p.umro||'';
   document.getElementById('f-opis').value=p.opis||'';
-  if(p.photo){document.getElementById('photo-preview').src=p.photo;document.getElementById('photo-preview').style.display='block';document.getElementById('photo-hint').textContent='Kliknite za promjenu';}
-  else{document.getElementById('photo-preview').style.display='none';document.getElementById('photo-hint').textContent='📷 Kliknite za odabir fotografije';}
   setCP(p.color||'#4a7c59');
+  renderEditGallery();
   closeModal('detail-modal-overlay');
   document.getElementById('edit-modal-overlay').classList.add('active');
 };
@@ -805,12 +843,16 @@ window.savePerson=async()=>{
   const ime=document.getElementById('f-ime').value.trim();
   const prez=document.getElementById('f-prez').value.trim();
   if(!ime&&!prez){alert('Unesite bar ime ili prezime.');return;}
+  const ci2=Math.min(coverIndex,Math.max(0,currentPhotos.length-1));
+  const coverPhoto = currentPhotos.length>0 ? (currentPhotos[ci2].url||currentPhotos[ci2].data) : null;
   const data={
     ime,prez,
     rodjen:document.getElementById('f-rod').value,
     umro:document.getElementById('f-umr').value,
     opis:document.getElementById('f-opis').value,
-    photo:currentPhoto||null,
+    photos: currentPhotos,
+    coverIndex: Math.min(coverIndex, Math.max(0, currentPhotos.length-1)),
+    photo: coverPhoto, // keep for backwards compat / card display
     color:selectedColor,
     updatedBy:currentUser.uid,
     updatedAt:serverTimestamp(),
@@ -844,7 +886,21 @@ window.openDetail=id=>{
   document.getElementById('d-name').textContent=`${p.ime||''} ${p.prez||''}`;
   document.getElementById('d-years').textContent=yrs(p);
   document.getElementById('d-desc').textContent=p.opis||'';
-  document.getElementById('d-photo').innerHTML=p.photo?`<img class="detail-photo" src="${p.photo}" alt="">`:`<div class="detail-photo-ph">👤</div>`;
+
+  // Build photo area — main photo + gallery strip
+  const photos = p.photos && p.photos.length ? p.photos : (p.photo ? [{data:p.photo}] : []);
+  const ci = Math.min(p.coverIndex||0, Math.max(0,photos.length-1));
+  const mainSrc = photos.length ? (photos[ci].url||photos[ci].data) : null;
+  let photoHTML = mainSrc
+    ? `<img class="detail-main-photo" id="d-main-photo" src="${mainSrc}" alt="">`
+    : `<div class="detail-photo-ph">👤</div>`;
+  if(photos.length>1){
+    photoHTML += `<div class="detail-gallery">`
+      + photos.map((ph,i)=>`<div class="detail-gallery-item${i===ci?' active':''}" onclick="switchDetailPhoto('${id}',${i})"><img src="${ph.url||ph.data}" alt=""></div>`).join('')
+      + `</div>`;
+  }
+  document.getElementById('d-photo').innerHTML=photoHTML;
+
   const canEdit=isAdmin||(p.createdBy===currentUser.uid);
   const canDel=isAdmin;
   document.getElementById('d-actions').innerHTML=
@@ -852,6 +908,14 @@ window.openDetail=id=>{
     +`<button class="btn" onclick="openManageConn('${id}')">🔗 Veze</button>`
     +(canDel?`<button class="btn btn-danger" onclick="delPerson('${id}')">🗑 Obriši</button>`:'');
   document.getElementById('detail-modal-overlay').classList.add('active');
+};
+
+window.switchDetailPhoto=(id,idx)=>{
+  const p=people[id];
+  const photos=p.photos&&p.photos.length?p.photos:(p.photo?[{data:p.photo}]:[]);
+  const mainEl=document.getElementById('d-main-photo');
+  if(mainEl) mainEl.src=photos[idx].url||photos[idx].data;
+  document.querySelectorAll('.detail-gallery-item').forEach((el,i)=>el.classList.toggle('active',i===idx));
 };
 
 window.delPerson=async(id)=>{
@@ -997,27 +1061,102 @@ window.rejectPerson=async(id)=>{
 // ══════════════════════════════════════════════════════
 // PHOTO & COLOR
 // ══════════════════════════════════════════════════════
-window.handlePhoto=e=>{
-  const f=e.target.files[0];if(!f)return;
-  // Resize before storing as base64
-  const img=new Image();
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    img.onload=()=>{
-      const canvas=document.createElement('canvas');
-      const MAX=600;
-      let w=img.width,h=img.height;
-      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      currentPhoto=canvas.toDataURL('image/jpeg',.75);
-      document.getElementById('photo-preview').src=currentPhoto;
-      document.getElementById('photo-preview').style.display='block';
-      document.getElementById('photo-hint').textContent='Kliknite za promjenu';
+let currentPhotos = [];   // [{data: base64}]
+let coverIndex = 0;
+
+function resizeImage(file, maxPx=500, quality=0.72){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
+        const c=document.createElement('canvas');
+        c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(c.toDataURL('image/jpeg',quality));
+      };
+      img.src=ev.target.result;
     };
-    img.src=ev.target.result;
-  };
-  reader.readAsDataURL(f);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Cloudinary config — set your cloud_name and upload_preset here
+const CLOUDINARY_CLOUD = '';   // e.g. 'myfamilytree'
+const CLOUDINARY_PRESET = '';  // e.g. 'family_unsigned'
+
+async function uploadToCloudinary(file){
+  const form=new FormData();
+  form.append('file', file);
+  form.append('upload_preset', CLOUDINARY_PRESET);
+  const res=await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`,{method:'POST',body:form});
+  const json=await res.json();
+  if(json.error) throw new Error(json.error.message);
+  // Return optimized URL (auto quality, max 600px wide)
+  return json.secure_url.replace('/upload/','/upload/w_600,q_auto,f_auto/');
+}
+
+window.handlePhotos=async(e)=>{
+  const files=[...e.target.files];
+  e.target.value='';
+
+  const useCloudinary = CLOUDINARY_CLOUD && CLOUDINARY_PRESET;
+  const progEl=document.getElementById('upload-progress');
+  const noticeEl=document.getElementById('cloudinary-notice');
+
+  for(const f of files){
+    progEl.style.display='block';
+    progEl.textContent=`⏳ Uploadanje: ${f.name}...`;
+    try {
+      let photoEntry;
+      if(useCloudinary){
+        const url=await uploadToCloudinary(f);
+        photoEntry={url, data:url}; // use URL as data for display
+        noticeEl.style.display='block';
+      } else {
+        // Fallback: base64 compressed (max 4 photos)
+        if(currentPhotos.length>=4){alert('Bez Cloudinary: max 4 fotografije.');break;}
+        const data=await resizeImage(f);
+        photoEntry={data};
+      }
+      currentPhotos.push(photoEntry);
+    } catch(err){
+      alert('Upload nije uspio: '+err.message);
+    }
+  }
+  progEl.style.display='none';
+  renderEditGallery();
+};
+
+function renderEditGallery(){
+  const grid=document.getElementById('edit-gallery-grid');
+  if(!grid)return;
+  const useCloud=CLOUDINARY_CLOUD&&CLOUDINARY_PRESET;
+  const MAX=useCloud?999:4; // unlimited with Cloudinary, 4 without
+  let html=currentPhotos.map((ph,i)=>`
+    <div class="gallery-item${i===coverIndex?' is-cover':''}" onclick="setCover(${i})">
+      <img src="${ph.url||ph.data}" alt="">
+      ${i===coverIndex?'<span class="gallery-cover-badge">★ Naslovna</span>':''}
+      <button class="gallery-del" onclick="delPhoto(event,${i})">×</button>
+    </div>`).join('');
+  if(currentPhotos.length<MAX){
+    html+=`<div class="gallery-add">
+      <input type="file" accept="image/*" multiple onchange="handlePhotos(event)">
+      <div class="gallery-add-icon">📷</div>
+      <div class="gallery-add-text">Dodaj${useCloud?'':' (max '+MAX+')'}</div>
+    </div>`;
+  }
+  grid.innerHTML=html;
+}
+
+window.setCover=(i)=>{ coverIndex=i; renderEditGallery(); };
+window.delPhoto=(e,i)=>{
+  e.stopPropagation();
+  currentPhotos.splice(i,1);
+  if(coverIndex>=currentPhotos.length) coverIndex=Math.max(0,currentPhotos.length-1);
+  renderEditGallery();
 };
 
 window.addRecent=c=>{recentColors=[c,...recentColors.filter(x=>x!==c)].slice(0,8);renderRC();};
