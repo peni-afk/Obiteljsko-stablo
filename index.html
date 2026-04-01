@@ -185,6 +185,9 @@
       <div class="form-group">
         <label>Lozinka</label>
         <input type="password" id="auth-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitAuth()">
+        <div style="text-align:right;margin-top:6px;">
+          <a href="#" onclick="resetPassword(event)" style="font-size:.76rem;color:var(--gold);text-decoration:none;opacity:.8;">Zaboravili ste lozinku?</a>
+        </div>
       </div>
     </div>
     <div class="auth-footer">
@@ -358,7 +361,7 @@
 import { initializeApp, getApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut as fbSignOut,
-  updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  updateProfile, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot,
   addDoc, updateDoc, deleteDoc, query, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -441,6 +444,30 @@ window.submitAuth = async () => {
       'auth/user-disabled':'Ovaj račun je deaktiviran.',
     };
     errEl.textContent=msgs[e.code]||('Greška: '+e.code+' — '+e.message);
+    errEl.style.display='block';
+  }
+};
+
+window.resetPassword = async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('auth-email').value.trim();
+  const errEl = document.getElementById('auth-error');
+  const infoEl = document.getElementById('auth-info');
+  errEl.style.display='none'; infoEl.style.display='none';
+  if(!email){
+    errEl.textContent='Unesite email adresu iznad, pa kliknite "Zaboravili ste lozinku?".';
+    errEl.style.display='block'; return;
+  }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    infoEl.textContent='Email za reset lozinke je poslan na ' + email + '. Provjerite inbox (i spam folder).';
+    infoEl.style.display='block';
+  } catch(e) {
+    const msgs = {
+      'auth/user-not-found': 'Nema korisnika s tim emailom.',
+      'auth/invalid-email': 'Nevažeći email.',
+    };
+    errEl.textContent = msgs[e.code] || e.message;
     errEl.style.display='block';
   }
 };
