@@ -536,7 +536,7 @@ function unsubAll(){ if(unsubPeople)unsubPeople(); if(unsubRelations)unsubRelati
 
 function setSyncing(state){ // 'ok','syncing','error'
   const dot=document.getElementById('sync-dot');
-  dot.className=''; dot.classList.add(state==='syncing'?'syncing':state==='error'?'error':'');
+  dot.className=state==='syncing'?'syncing':state==='error'?'error':'';
 }
 
 async function startListeners(){
