@@ -132,6 +132,27 @@
   .conn-row-type{font-size:.7rem;color:rgba(26,28,20,.44);margin-top:2px;}
   ::-webkit-scrollbar{width:5px;}
   ::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:3px;}
+  /* Gallery */
+  .gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
+  .gallery-item{position:relative;border-radius:3px;overflow:hidden;aspect-ratio:1;cursor:pointer;border:2px solid transparent;transition:all .2s;}
+  .gallery-item:hover{border-color:var(--gold);}
+  .gallery-item.is-cover{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,168,76,.4);}
+  .gallery-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .gallery-cover-badge{position:absolute;bottom:4px;left:4px;background:var(--gold);color:var(--bg);font-size:.58rem;padding:2px 6px;border-radius:8px;font-family:sans-serif;font-weight:700;letter-spacing:.04em;}
+  .gallery-del{position:absolute;top:3px;right:3px;background:rgba(192,57,43,.85);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.75rem;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;}
+  .gallery-item:hover .gallery-del{display:flex;}
+  .gallery-add{border:2px dashed rgba(26,28,20,.2);border-radius:3px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;position:relative;background:rgba(255,255,255,.3);}
+  .gallery-add:hover{border-color:var(--gold);background:rgba(201,168,76,.06);}
+  .gallery-add input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .gallery-add-icon{font-size:1.4rem;color:rgba(26,28,20,.3);margin-bottom:3px;}
+  .gallery-add-text{font-size:.68rem;color:rgba(26,28,20,.35);text-align:center;}
+  /* Detail gallery */
+  .detail-gallery{display:flex;gap:6px;padding:10px 24px;overflow-x:auto;background:rgba(26,28,20,.04);}
+  .detail-gallery-item{flex-shrink:0;width:72px;height:72px;border-radius:3px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:all .2s;position:relative;}
+  .detail-gallery-item:hover{border-color:var(--gold);}
+  .detail-gallery-item.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,168,76,.35);}
+  .detail-gallery-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .detail-main-photo{width:100%;height:220px;object-fit:cover;display:block;transition:opacity .2s;}
 
   /* Users list in admin */
   .user-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(26,28,20,.08);gap:10px;}
@@ -252,11 +273,13 @@
     <div class="modal-header"><h2 id="edit-title">Nova osoba</h2><button class="modal-close" onclick="closeEditModal()">×</button></div>
     <div class="modal-body">
       <div class="form-group">
-        <label>Fotografija</label>
-        <div class="photo-upload">
-          <input type="file" accept="image/*" id="photo-input" onchange="handlePhoto(event)">
-          <img class="photo-preview" id="photo-preview" src="" style="display:none" alt="">
-          <div class="photo-upload-text" id="photo-hint">📷 Kliknite za odabir fotografije</div>
+        <label>Fotografije <span style="font-weight:400;text-transform:none;font-size:.75rem;color:rgba(26,28,20,.4);">(max 4 · kliknite za naslovnu)</span></label>
+        <div class="gallery-grid" id="edit-gallery-grid">
+          <div class="gallery-add" id="gallery-add-btn">
+            <input type="file" accept="image/*" multiple id="photo-input" onchange="handlePhotos(event)">
+            <div class="gallery-add-icon">📷</div>
+            <div class="gallery-add-text">Dodaj sliku</div>
+          </div>
         </div>
       </div>
       <div class="form-row">
@@ -357,7 +380,8 @@ const gProvider = new GoogleAuthProvider();
 // ══════════════════════════════════════════════════════
 let people={}, relations={}, positions={};
 let selectedColor='#4a7c59';
-let recentColors=['#4a7c59','#7c4a6e','#c9a84c','#4a6e7c','#c05a3a'];
+let currentPhoto=null; // legacy
+let recentColors=['#47d170','#d44aad','#e3b73d','#5bb2d4','#e35e34','#dde334','#4ee334'];
 let editingId=null, currentPhoto=null;
 let panX=0,panY=0,scale=1;
 let isPanning=false,lastPX=0,lastPY=0;
@@ -777,25 +801,26 @@ window.closeModal=id=>document.getElementById(id).classList.remove('active');
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');});});
 
 window.openAddModal=()=>{
-  editingId=null;currentPhoto=null;
+  editingId=null; currentPhotos=[]; coverIndex=0;
   document.getElementById('edit-title').textContent='Nova osoba';
   ['f-ime','f-prez','f-opis'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('f-rod').value='';document.getElementById('f-umr').value='';
-  document.getElementById('photo-preview').style.display='none';
-  document.getElementById('photo-hint').textContent='📷 Kliknite za odabir fotografije';
+  document.getElementById('f-rod').value=''; document.getElementById('f-umr').value='';
   setCP('#4a7c59');
+  renderEditGallery();
   document.getElementById('edit-modal-overlay').classList.add('active');
 };
 
 window.openEditModal=id=>{
-  editingId=id;const p=people[id];currentPhoto=p.photo||null;
+  editingId=id; const p=people[id];
+  // Load existing photos — support both old (single photo) and new (array) format
+  currentPhotos = p.photos ? [...p.photos] : (p.photo ? [{data:p.photo}] : []);
+  coverIndex = p.coverIndex||0;
   document.getElementById('edit-title').textContent='Uredi osobu';
-  document.getElementById('f-ime').value=p.ime||'';document.getElementById('f-prez').value=p.prez||'';
-  document.getElementById('f-rod').value=p.rodjen||'';document.getElementById('f-umr').value=p.umro||'';
+  document.getElementById('f-ime').value=p.ime||''; document.getElementById('f-prez').value=p.prez||'';
+  document.getElementById('f-rod').value=p.rodjen||''; document.getElementById('f-umr').value=p.umro||'';
   document.getElementById('f-opis').value=p.opis||'';
-  if(p.photo){document.getElementById('photo-preview').src=p.photo;document.getElementById('photo-preview').style.display='block';document.getElementById('photo-hint').textContent='Kliknite za promjenu';}
-  else{document.getElementById('photo-preview').style.display='none';document.getElementById('photo-hint').textContent='📷 Kliknite za odabir fotografije';}
   setCP(p.color||'#4a7c59');
+  renderEditGallery();
   closeModal('detail-modal-overlay');
   document.getElementById('edit-modal-overlay').classList.add('active');
 };
@@ -805,12 +830,15 @@ window.savePerson=async()=>{
   const ime=document.getElementById('f-ime').value.trim();
   const prez=document.getElementById('f-prez').value.trim();
   if(!ime&&!prez){alert('Unesite bar ime ili prezime.');return;}
+  const coverPhoto = currentPhotos.length>0 ? currentPhotos[Math.min(coverIndex,currentPhotos.length-1)].data : null;
   const data={
     ime,prez,
     rodjen:document.getElementById('f-rod').value,
     umro:document.getElementById('f-umr').value,
     opis:document.getElementById('f-opis').value,
-    photo:currentPhoto||null,
+    photos: currentPhotos,
+    coverIndex: Math.min(coverIndex, Math.max(0, currentPhotos.length-1)),
+    photo: coverPhoto, // keep for backwards compat / card display
     color:selectedColor,
     updatedBy:currentUser.uid,
     updatedAt:serverTimestamp(),
@@ -844,7 +872,21 @@ window.openDetail=id=>{
   document.getElementById('d-name').textContent=`${p.ime||''} ${p.prez||''}`;
   document.getElementById('d-years').textContent=yrs(p);
   document.getElementById('d-desc').textContent=p.opis||'';
-  document.getElementById('d-photo').innerHTML=p.photo?`<img class="detail-photo" src="${p.photo}" alt="">`:`<div class="detail-photo-ph">👤</div>`;
+
+  // Build photo area — main photo + gallery strip
+  const photos = p.photos && p.photos.length ? p.photos : (p.photo ? [{data:p.photo}] : []);
+  const ci = Math.min(p.coverIndex||0, Math.max(0,photos.length-1));
+  const mainSrc = photos.length ? photos[ci].data : null;
+  let photoHTML = mainSrc
+    ? `<img class="detail-main-photo" id="d-main-photo" src="${mainSrc}" alt="">`
+    : `<div class="detail-photo-ph">👤</div>`;
+  if(photos.length>1){
+    photoHTML += `<div class="detail-gallery">`
+      + photos.map((ph,i)=>`<div class="detail-gallery-item${i===ci?' active':''}" onclick="switchDetailPhoto('${id}',${i})"><img src="${ph.data}" alt=""></div>`).join('')
+      + `</div>`;
+  }
+  document.getElementById('d-photo').innerHTML=photoHTML;
+
   const canEdit=isAdmin||(p.createdBy===currentUser.uid);
   const canDel=isAdmin;
   document.getElementById('d-actions').innerHTML=
@@ -852,6 +894,14 @@ window.openDetail=id=>{
     +`<button class="btn" onclick="openManageConn('${id}')">🔗 Veze</button>`
     +(canDel?`<button class="btn btn-danger" onclick="delPerson('${id}')">🗑 Obriši</button>`:'');
   document.getElementById('detail-modal-overlay').classList.add('active');
+};
+
+window.switchDetailPhoto=(id,idx)=>{
+  const p=people[id];
+  const photos=p.photos&&p.photos.length?p.photos:(p.photo?[{data:p.photo}]:[]);
+  const mainEl=document.getElementById('d-main-photo');
+  if(mainEl) mainEl.src=photos[idx].data;
+  document.querySelectorAll('.detail-gallery-item').forEach((el,i)=>el.classList.toggle('active',i===idx));
 };
 
 window.delPerson=async(id)=>{
@@ -997,27 +1047,69 @@ window.rejectPerson=async(id)=>{
 // ══════════════════════════════════════════════════════
 // PHOTO & COLOR
 // ══════════════════════════════════════════════════════
-window.handlePhoto=e=>{
-  const f=e.target.files[0];if(!f)return;
-  // Resize before storing as base64
-  const img=new Image();
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    img.onload=()=>{
-      const canvas=document.createElement('canvas');
-      const MAX=600;
-      let w=img.width,h=img.height;
-      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      currentPhoto=canvas.toDataURL('image/jpeg',.75);
-      document.getElementById('photo-preview').src=currentPhoto;
-      document.getElementById('photo-preview').style.display='block';
-      document.getElementById('photo-hint').textContent='Kliknite za promjenu';
+let currentPhotos = [];   // [{data: base64}]
+let coverIndex = 0;
+
+function resizeImage(file, maxPx=500, quality=0.72){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
+        const c=document.createElement('canvas');
+        c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(c.toDataURL('image/jpeg',quality));
+      };
+      img.src=ev.target.result;
     };
-    img.src=ev.target.result;
-  };
-  reader.readAsDataURL(f);
+    reader.readAsDataURL(file);
+  });
+}
+
+window.handlePhotos=async(e)=>{
+  const files=[...e.target.files];
+  const MAX_PHOTOS=4;
+  const remaining=MAX_PHOTOS-currentPhotos.length;
+  if(remaining<=0){alert('Maksimalno 4 fotografije po osobi.');return;}
+  const toAdd=files.slice(0,remaining);
+  for(const f of toAdd){
+    const data=await resizeImage(f);
+    currentPhotos.push({data});
+  }
+  // reset file input so same file can be re-added if needed
+  e.target.value='';
+  renderEditGallery();
+};
+
+function renderEditGallery(){
+  const grid=document.getElementById('edit-gallery-grid');
+  if(!grid)return;
+  const MAX=4;
+  let html=currentPhotos.map((ph,i)=>`
+    <div class="gallery-item${i===coverIndex?' is-cover':''}" onclick="setCover(${i})">
+      <img src="${ph.data}" alt="">
+      ${i===coverIndex?'<span class="gallery-cover-badge">★ Naslovna</span>':''}
+      <button class="gallery-del" onclick="delPhoto(event,${i})">×</button>
+    </div>`).join('');
+  if(currentPhotos.length<MAX){
+    html+=`<div class="gallery-add">
+      <input type="file" accept="image/*" multiple onchange="handlePhotos(event)">
+      <div class="gallery-add-icon">📷</div>
+      <div class="gallery-add-text">Dodaj</div>
+    </div>`;
+  }
+  grid.innerHTML=html;
+}
+
+window.setCover=(i)=>{ coverIndex=i; renderEditGallery(); };
+window.delPhoto=(e,i)=>{
+  e.stopPropagation();
+  currentPhotos.splice(i,1);
+  if(coverIndex>=currentPhotos.length) coverIndex=Math.max(0,currentPhotos.length-1);
+  renderEditGallery();
 };
 
 window.addRecent=c=>{recentColors=[c,...recentColors.filter(x=>x!==c)].slice(0,8);renderRC();};
