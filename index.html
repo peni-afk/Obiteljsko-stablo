@@ -416,6 +416,26 @@ const REL={
   ostalo:     {l:'Ostalo',          ic:'🔗',dc:'Vlastita definicija',           dash:true},
 };
 
+// Returns the label for a relation FROM the perspective of 'viewerId'
+function relLabel(rel, viewerId) {
+  const isFrom = rel.from === viewerId;
+  switch(rel.type) {
+    case 'roditelj':    return isFrom ? 'Roditelj od'        : 'Dijete od';
+    case 'dijete':      return isFrom ? 'Dijete od'          : 'Roditelj od';
+    case 'djed_baka':   return isFrom ? 'Djed / Baka od'     : 'Unuk / Unuka od';
+    case 'unuk':        return isFrom ? 'Unuk / Unuka od'    : 'Djed / Baka od';
+    case 'stric_ujak':  return isFrom ? 'Stric / Ujak / Teta od' : 'Nećak / Nećakinja od';
+    case 'necak':       return isFrom ? 'Nećak / Nećakinja od'   : 'Stric / Ujak / Teta od';
+    // Symmetric — same label both ways
+    case 'bracni':      return 'Bračni par';
+    case 'partner':     return 'Partner';
+    case 'brat_sestra': return 'Brat / Sestra';
+    case 'polubrat':    return 'Polubrat / Sestra';
+    case 'rodak':       return 'Rođak / Rođakinja';
+    default:            return (REL[rel.type]||REL.ostalo).l;
+  }
+}
+
 document.getElementById('conn-grid').innerHTML=Object.entries(REL).map(([k,r])=>
   `<button class="conn-opt" onclick="confirmConnection('${k}')">
     <span class="conn-icon">${r.ic}</span>
@@ -825,7 +845,7 @@ window.openManageConn=async(id)=>{
   else{list.innerHTML=myRels.map(rel=>{
     const oid=rel.from===id?rel.to:rel.from;
     const o=people[oid];if(!o)return'';
-    const lbl=(REL[rel.type]||REL.ostalo).l;
+    const lbl=relLabel(rel, id);
     const canDel=isAdmin||(rel.createdBy===currentUser.uid);
     return`<div class="conn-row">
       <div><div class="conn-row-name">${o.ime||''} ${o.prez||''}</div><div class="conn-row-type">${lbl}</div></div>
@@ -1216,11 +1236,7 @@ window.exportExcel = () => {
       const otherId = rel.from===p.id ? rel.to : rel.from;
       const other = people[otherId];
       if(!other) return;
-      const label = (REL[rel.type]||REL.ostalo).l;
-      // Determine direction label
-      let dirLabel = label;
-      if(rel.type==='roditelj') dirLabel = rel.from===p.id ? 'Roditelj od' : 'Dijete od';
-      if(rel.type==='dijete')   dirLabel = rel.from===p.id ? 'Dijete od' : 'Roditelj od';
+      const dirLabel = relLabel(rel, p.id);
       if(!byType[dirLabel]) byType[dirLabel]=[];
       byType[dirLabel].push(`${other.ime||''} ${other.prez||''}`.trim());
     });
@@ -1238,9 +1254,9 @@ window.exportExcel = () => {
     // Add relation columns
     const relCols = [
       'Roditelj od','Dijete od','Bračni par','Partner',
-      'Brat / Sestra','Polubrat/sestra','Djed / Baka',
-      'Unuk / Unuka','Stric/Ujak/Teta','Nećak/Nećakinja',
-      'Rođak/Rođakinja','Ostalo'
+      'Brat / Sestra','Polubrat / Sestra','Djed / Baka od',
+      'Unuk / Unuka od','Stric / Ujak / Teta od','Nećak / Nećakinja od',
+      'Rođak / Rođakinja','Ostalo'
     ];
     relCols.forEach(col => {
       row[col] = byType[col] ? byType[col].join(', ') : '';
