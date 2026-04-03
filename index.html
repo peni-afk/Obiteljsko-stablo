@@ -1006,6 +1006,7 @@ window.savePerson=async()=>{
   closeModal('edit-modal-overlay');editingId=null;
 };
 
+let currentDetailPhotos=[];
 window.openDetail=id=>{
   const p=people[id];
   document.getElementById('d-title').textContent=`${p.ime||''} ${p.prez||''}`;
@@ -1016,6 +1017,7 @@ window.openDetail=id=>{
   // Build photo area — main photo + gallery strip
   const photos = p.photos && p.photos.length ? p.photos : (p.photo ? [{data:p.photo}] : []);
   const ci = Math.min(p.coverIndex||0, Math.max(0,photos.length-1));
+  currentDetailPhotos = photos;
   const mainSrc = photos.length ? (photos[ci].url||photos[ci].data) : null;
   const personName = `${p.ime||''}_${p.prez||''}`.trim()||'slika';
   const allSrcs = photos.map(ph=>ph.url||ph.data||ph);
@@ -1030,7 +1032,14 @@ window.openDetail=id=>{
     : `<div class="detail-photo-ph">👤</div>`;
   if(photos.length>1){
     photoHTML += `<div class="detail-gallery">`
-      + photos.map((ph,i)=>`<div class="detail-gallery-item${i===ci?' active':''}" onclick="switchDetailPhoto('${id}',${i})" ondblclick="openLightbox(${JSON.stringify(allSrcs)},${i},'${personName.replace(/'/g,\"\\\"\")}')" title="Klik=zamijeni · Dvoklik=uvećaj"><img src="${ph.url||ph.data}" alt=""></div>`).join('')
+      + photos.map((ph,i)=>{
+          const act=i===ci?' active':'';
+          return `<div class="detail-gallery-item${act}"
+            onclick="switchDetailPhoto('${id}',${i})"
+            ondblclick="openLightbox(currentDetailPhotos,${i},'${personName}')"
+            title="Klik=zamijeni · Dvoklik=uvećaj">
+            <img src="${ph.url||ph.data}" alt=""></div>`;
+        }).join('')
       + `</div>`;
   }
   document.getElementById('d-photo').innerHTML=photoHTML;
