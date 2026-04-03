@@ -164,6 +164,7 @@
   .status-pending{background:rgba(201,168,76,.15);color:#7a5f1a;}
   .status-admin{background:rgba(74,110,124,.15);color:#2d4a5a;}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -221,6 +222,7 @@
     <span><span id="sync-dot"></span></span>
     <span class="user-badge" id="user-badge"></span>
     <span id="admin-badge-wrap"></span>
+    <button class="btn" onclick="exportExcel()">📊 Excel</button>
     <button class="btn" id="connect-btn" onclick="toggleConnectMode()">🔗 Poveži</button>
     <button class="btn btn-primary" id="add-person-btn" onclick="openAddModal()">+ Dodaj osobu</button>
     <button class="btn" id="admin-btn" onclick="openAdminPanel()" style="display:none">👑 Admin <span class="pending-count" id="pending-count" style="display:none">0</span></button>
@@ -1194,6 +1196,99 @@ window.pickRC=c=>{selectedColor=c;document.getElementById('f-color').value=c;ren
 function setCP(c){selectedColor=c;const el=document.getElementById('f-color');if(el)el.value=c;setTimeout(renderRC,30);}
 
 window.addEventListener('resize',()=>redrawLines());
+
+// ══════════════════════════════════════════════════════
+// EXCEL EXPORT
+// ══════════════════════════════════════════════════════
+window.exportExcel = () => {
+  if(!Object.keys(people).length){ alert('Nema podataka za export.'); return; }
+
+  const relTypes = Object.values(REL).reduce((a,r)=>({...a,[r.l]:true}),{});
+
+  // Build rows — one per person
+  const rows = Object.values(people).map(p => {
+    // Find all relations for this person
+    const myRels = Object.values(relations).filter(r => r.from===p.id || r.to===p.id);
+
+    // Group relations by type
+    const byType = {};
+    myRels.forEach(rel => {
+      const otherId = rel.from===p.id ? rel.to : rel.from;
+      const other = people[otherId];
+      if(!other) return;
+      const label = (REL[rel.type]||REL.ostalo).l;
+      // Determine direction label
+      let dirLabel = label;
+      if(rel.type==='roditelj') dirLabel = rel.from===p.id ? 'Roditelj od' : 'Dijete od';
+      if(rel.type==='dijete')   dirLabel = rel.from===p.id ? 'Dijete od' : 'Roditelj od';
+      if(!byType[dirLabel]) byType[dirLabel]=[];
+      byType[dirLabel].push(`${other.ime||''} ${other.prez||''}`.trim());
+    });
+
+    const row = {
+      'ID': p.id,
+      'Ime': p.ime||'',
+      'Prezime': p.prez||'',
+      'Datum rođenja': p.rodjen||'',
+      'Datum smrti': p.umro||'',
+      'Opis': p.opis||'',
+      'Status': p.status==='pending' ? 'Na čekanju' : 'Odobren',
+    };
+
+    // Add relation columns
+    const relCols = [
+      'Roditelj od','Dijete od','Bračni par','Partner',
+      'Brat / Sestra','Polubrat/sestra','Djed / Baka',
+      'Unuk / Unuka','Stric/Ujak/Teta','Nećak/Nećakinja',
+      'Rođak/Rođakinja','Ostalo'
+    ];
+    relCols.forEach(col => {
+      row[col] = byType[col] ? byType[col].join(', ') : '';
+    });
+
+    return row;
+  });
+
+  // Sort by prezime then ime
+  rows.sort((a,b) => {
+    const s1 = (a.Prezime+a.Ime).toLowerCase();
+    const s2 = (b.Prezime+b.Ime).toLowerCase();
+    return s1.localeCompare(s2, 'hr');
+  });
+
+  // Create workbook
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:12}, // ID
+    {wch:16}, // Ime
+    {wch:20}, // Prezime
+    {wch:16}, // Datum rođenja
+    {wch:14}, // Datum smrti
+    {wch:40}, // Opis
+    {wch:12}, // Status
+    {wch:30}, // Roditelj od
+    {wch:30}, // Dijete od
+    {wch:25}, // Bračni par
+    {wch:25}, // Partner
+    {wch:30}, // Brat/Sestra
+    {wch:25}, // Polubrat
+    {wch:25}, // Djed/Baka
+    {wch:25}, // Unuk
+    {wch:25}, // Stric/Ujak
+    {wch:25}, // Nećak
+    {wch:25}, // Rođak
+    {wch:25}, // Ostalo
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Obiteljsko stablo');
+
+  // Generate filename with date
+  const date = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `obiteljsko-stablo-${date}.xlsx`);
+};
 </script>
 </body>
 </html>
