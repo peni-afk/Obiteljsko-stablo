@@ -157,7 +157,7 @@
     transition:all .2s;
   }
   .lb-btn:hover{background:rgba(201,168,76,.2); border-color:var(--gold);}
-  #lb-nav-left, #lb-nav-right{
+  #lb-prev, #lb-next{
     position:fixed; top:50%; transform:translateY(-50%);
     width:48px; height:48px; background:rgba(13,15,10,.7);
     border:1px solid rgba(201,168,76,.3); color:var(--gold);
@@ -165,9 +165,9 @@
     display:flex; align-items:center; justify-content:center;
     transition:all .2s; z-index:2001;
   }
-  #lb-nav-left{left:16px;}
-  #lb-nav-right{right:16px;}
-  #lb-nav-left:hover, #lb-nav-right:hover{background:rgba(201,168,76,.2); border-color:var(--gold);}
+  #lb-prev{left:16px;}
+  #lb-next{right:16px;}
+  #lb-prev:hover, #lb-next:hover{background:rgba(201,168,76,.2); border-color:var(--gold);}
   #lb-counter{
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
     color:rgba(245,240,232,.5); font-family:'Crimson Pro',serif;
@@ -304,8 +304,8 @@
     <button class="lb-btn" onclick="lbReset()" title="Reset">⌖</button>
     <button class="lb-btn" onclick="lbClose()" title="Zatvori">×</button>
   </div>
-  <button id="lb-nav-left" onclick="lbNav(-1)">‹</button>
-  <button id="lb-nav-right" onclick="lbNav(1)">›</button>
+  <button id="lb-prev" onclick="lbNav(-1)">‹</button>
+  <button id="lb-next" onclick="lbNav(1)">›</button>
   <div id="lb-counter"></div>
   <div id="lb-dl">
     <button class="lb-btn" onclick="lbDownload()" title="Preuzmi" style="width:auto;padding:0 14px;gap:6px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;">⬇ Preuzmi</button>
@@ -1022,7 +1022,7 @@ window.openDetail=id=>{
   const personName = `${p.ime||''}_${p.prez||''}`.trim()||'slika';
   const allSrcs = photos.map(ph=>ph.url||ph.data||ph);
   let photoHTML = mainSrc
-    ? `<div style="position:relative;cursor:zoom-in;" onclick="openLightbox(${JSON.stringify(allSrcs)},${ci},'${personName.replace(/'/g,"\\'")}')">
+    ? `<div style="position:relative;cursor:zoom-in;" onclick="openLightbox(currentDetailPhotos,0,''+personName+'')">
         <img class="detail-main-photo" id="d-main-photo" src="${mainSrc}" alt="" style="cursor:zoom-in;">
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;"
           onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
@@ -1336,7 +1336,7 @@ window.openLightbox=(photos, idx, personName)=>{
 };
 
 function lbRender(){
-  const img=document.getElementById('lightbox-img');
+  const img=document.getElementById('lb-img');
   const src=lbPhotos[lbIndex]?.url||lbPhotos[lbIndex]?.data||lbPhotos[lbIndex];
   img.src=src;
   img.style.transform=`scale(${lbScale}) translate(${lbTransX/lbScale}px,${lbTransY/lbScale}px)`;
@@ -1391,7 +1391,7 @@ document.getElementById('lightbox').addEventListener('wheel',e=>{
 },{passive:false});
 
 // Drag to pan when zoomed
-const lbImg=document.getElementById('lightbox-img');
+const lbImg=document.getElementById('lb-img');
 lbImg.addEventListener('mousedown',e=>{
   if(lbScale<=1)return;
   lbDragging=true; lbDragStartX=e.clientX-lbTransX; lbDragStartY=e.clientY-lbTransY;
