@@ -132,6 +132,85 @@
   .conn-row-type{font-size:.7rem;color:rgba(26,28,20,.44);margin-top:2px;}
   ::-webkit-scrollbar{width:5px;}
   ::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:3px;}
+  /* Lightbox */
+  #lightbox{
+    display:none; position:fixed; inset:0; z-index:2000;
+    background:rgba(0,0,0,.85); backdrop-filter:blur(6px);
+    align-items:center; justify-content:center;
+  }
+  #lightbox.open{ display:flex; }
+  #lightbox-inner{
+    position:relative; max-width:90vw; max-height:90vh;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #lightbox-img{
+    max-width:88vw; max-height:88vh;
+    object-fit:contain; border-radius:3px;
+    box-shadow:0 8px 60px rgba(0,0,0,.9);
+    transform-origin:center center;
+    transition:transform .15s ease;
+    cursor:zoom-in; user-select:none; display:block;
+  }
+  #lightbox-img.zoomed{ cursor:grab; }
+  #lightbox-img.zoomed:active{ cursor:grabbing; }
+  .lb-btn{
+    position:absolute; background:rgba(13,15,10,.75);
+    border:1px solid rgba(201,168,76,.4); color:var(--gold);
+    cursor:pointer; border-radius:2px; transition:all .2s;
+    font-family:'Crimson Pro',serif; line-height:1;
+  }
+  .lb-btn:hover{ background:rgba(201,168,76,.85); color:#0d0f0a; }
+  #lb-close{ top:-16px; right:-16px; width:32px; height:32px; font-size:1.1rem; display:flex; align-items:center; justify-content:center; border-radius:50%; }
+  #lb-prev{ left:-48px; top:50%; transform:translateY(-50%); width:38px; height:38px; font-size:1.2rem; display:flex; align-items:center; justify-content:center; }
+  #lb-next{ right:-48px; top:50%; transform:translateY(-50%); width:38px; height:38px; font-size:1.2rem; display:flex; align-items:center; justify-content:center; }
+  #lb-zoom-in{ bottom:-44px; right:44px; padding:5px 12px; font-size:.8rem; letter-spacing:.06em; }
+  #lb-zoom-out{ bottom:-44px; right:110px; padding:5px 12px; font-size:.8rem; letter-spacing:.06em; }
+  #lb-download{ bottom:-44px; left:0; padding:5px 12px; font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; }
+  #lb-counter{ bottom:-44px; left:50%; transform:translateX(-50%); font-size:.78rem; color:rgba(245,240,232,.45); font-family:'Crimson Pro',serif; white-space:nowrap; }
+  /* Lightbox */
+  #lightbox{
+    display:none; position:fixed; inset:0; z-index:2000;
+    background:rgba(0,0,0,.92); backdrop-filter:blur(6px);
+    align-items:center; justify-content:center; cursor:zoom-in;
+  }
+  #lightbox.active{display:flex;}
+  #lightbox.zoomed{cursor:grab;}
+  #lightbox.zoomed:active{cursor:grabbing;}
+  #lb-img{
+    max-width:90vw; max-height:90vh; object-fit:contain;
+    transition:transform .15s; user-select:none; pointer-events:none;
+    border-radius:2px; box-shadow:0 8px 60px rgba(0,0,0,.8);
+  }
+  #lb-controls{
+    position:fixed; top:20px; right:20px; display:flex; gap:8px; z-index:2001;
+  }
+  .lb-btn{
+    width:40px; height:40px; background:rgba(13,15,10,.8);
+    border:1px solid rgba(201,168,76,.4); color:var(--gold);
+    font-size:1.1rem; cursor:pointer; border-radius:2px;
+    display:flex; align-items:center; justify-content:center;
+    transition:all .2s;
+  }
+  .lb-btn:hover{background:rgba(201,168,76,.2); border-color:var(--gold);}
+  #lb-nav-left, #lb-nav-right{
+    position:fixed; top:50%; transform:translateY(-50%);
+    width:48px; height:48px; background:rgba(13,15,10,.7);
+    border:1px solid rgba(201,168,76,.3); color:var(--gold);
+    font-size:1.4rem; cursor:pointer; border-radius:2px;
+    display:flex; align-items:center; justify-content:center;
+    transition:all .2s; z-index:2001;
+  }
+  #lb-nav-left{left:16px;}
+  #lb-nav-right{right:16px;}
+  #lb-nav-left:hover, #lb-nav-right:hover{background:rgba(201,168,76,.2); border-color:var(--gold);}
+  #lb-counter{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    color:rgba(245,240,232,.5); font-family:'Crimson Pro',serif;
+    font-size:.85rem; letter-spacing:.1em; z-index:2001;
+  }
+  #lb-dl{
+    position:fixed; bottom:20px; right:20px; z-index:2001;
+  }
   /* Gallery */
   .gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
   .gallery-item{position:relative;border-radius:3px;overflow:hidden;aspect-ratio:1;cursor:pointer;border:2px solid transparent;transition:all .2s;}
@@ -250,7 +329,37 @@
   Povuci pozadinu → pomiči | Kotačić → zoom
 </div>
 
+<!-- ══ LIGHTBOX ══ -->
+<div id="lightbox" onclick="lbClickOutside(event)">
+  <div id="lightbox-inner">
+    <img id="lightbox-img" src="" alt="" onclick="lbToggleZoom(event)">
+    <button class="lb-btn" id="lb-close" onclick="lbClose()">×</button>
+    <button class="lb-btn" id="lb-prev" onclick="lbNav(-1)">‹</button>
+    <button class="lb-btn" id="lb-next" onclick="lbNav(1)">›</button>
+    <button class="lb-btn" id="lb-zoom-in" onclick="lbZoom(1.3)">＋ Zoom</button>
+    <button class="lb-btn" id="lb-zoom-out" onclick="lbZoom(0.77)">－ Zoom</button>
+    <button class="lb-btn" id="lb-download" onclick="lbDownload()">⬇ Preuzmi</button>
+    <div id="lb-counter"></div>
+  </div>
+</div>
 </div><!-- end #app -->
+
+<!-- ══ LIGHTBOX ══ -->
+<div id="lightbox" onclick="lbClickOutside(event)">
+  <img id="lb-img" src="" alt="" draggable="false">
+  <div id="lb-controls">
+    <button class="lb-btn" onclick="lbZoom(1.3)" title="Zoom in">+</button>
+    <button class="lb-btn" onclick="lbZoom(0.77)" title="Zoom out">−</button>
+    <button class="lb-btn" onclick="lbReset()" title="Reset">⌖</button>
+    <button class="lb-btn" onclick="lbClose()" title="Zatvori">×</button>
+  </div>
+  <button id="lb-nav-left" onclick="lbNav(-1)">‹</button>
+  <button id="lb-nav-right" onclick="lbNav(1)">›</button>
+  <div id="lb-counter"></div>
+  <div id="lb-dl">
+    <button class="lb-btn" onclick="lbDownload()" title="Preuzmi" style="width:auto;padding:0 14px;gap:6px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;">⬇ Preuzmi</button>
+  </div>
+</div>
 
 <!-- ══ CONNECTION TYPE MODAL ══ -->
 <div class="modal-overlay" id="conn-type-overlay">
@@ -635,8 +744,19 @@ async function checkPendingCount(){
 // HELPERS
 // ══════════════════════════════════════════════════════
 const W=()=>window.innerWidth, H=()=>window.innerHeight;
-function fy(d){if(!d)return'';return new Date(d+'T00:00:00').getFullYear();}
-function yrs(p){const b=fy(p.rodjen),d=fy(p.umro);if(!b&&!d)return'';if(b&&!d)return`* ${b}`;if(!b&&d)return`† ${d}`;return`${b} – ${d}`;}
+function fy(d){
+  if(!d)return'';
+  const [y,m,dd]=d.split('-');
+  if(!m) return y; // fallback if only year stored
+  return `${dd}.${m}.${y}`;
+}
+function yrs(p){
+  const b=fy(p.rodjen),d=fy(p.umro);
+  if(!b&&!d)return'';
+  if(b&&!d)return`* ${b}`;
+  if(!b&&d)return`† ${d}`;
+  return`${b} – ${d}`;
+}
 function ws(x,y){return{x:x*scale+panX,y:y*scale+panY};}
 function setSave(state){ // visual sync dot for saves
   setSyncing(state==='saving'?'syncing':'ok');
@@ -946,12 +1066,20 @@ window.openDetail=id=>{
   const photos = p.photos && p.photos.length ? p.photos : (p.photo ? [{data:p.photo}] : []);
   const ci = Math.min(p.coverIndex||0, Math.max(0,photos.length-1));
   const mainSrc = photos.length ? (photos[ci].url||photos[ci].data) : null;
+  const personName = `${p.ime||''}_${p.prez||''}`.trim()||'slika';
+  const allSrcs = photos.map(ph=>ph.url||ph.data||ph);
   let photoHTML = mainSrc
-    ? `<img class="detail-main-photo" id="d-main-photo" src="${mainSrc}" alt="">`
+    ? `<div style="position:relative;cursor:zoom-in;" onclick="openLightbox(${JSON.stringify(allSrcs)},${ci},'${personName.replace(/'/g,"\\'")}')">
+        <img class="detail-main-photo" id="d-main-photo" src="${mainSrc}" alt="" style="cursor:zoom-in;">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;"
+          onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
+          <span style="background:rgba(0,0,0,.55);color:#fff;padding:6px 14px;border-radius:2px;font-size:.78rem;font-family:'Crimson Pro',serif;letter-spacing:.06em;">🔍 Klikni za uvećanje</span>
+        </div>
+      </div>`
     : `<div class="detail-photo-ph">👤</div>`;
   if(photos.length>1){
     photoHTML += `<div class="detail-gallery">`
-      + photos.map((ph,i)=>`<div class="detail-gallery-item${i===ci?' active':''}" onclick="switchDetailPhoto('${id}',${i})"><img src="${ph.url||ph.data}" alt=""></div>`).join('')
+      + photos.map((ph,i)=>`<div class="detail-gallery-item${i===ci?' active':''}" onclick="switchDetailPhoto('${id}',${i})" ondblclick="openLightbox(${JSON.stringify(allSrcs)},${i},'${personName.replace(/'/g,\"\\\"\")}')" title="Klik=zamijeni · Dvoklik=uvećaj"><img src="${ph.url||ph.data}" alt=""></div>`).join('')
       + `</div>`;
   }
   document.getElementById('d-photo').innerHTML=photoHTML;
@@ -965,11 +1093,29 @@ window.openDetail=id=>{
   document.getElementById('detail-modal-overlay').classList.add('active');
 };
 
+window.downloadPhoto=(src, name)=>{
+  const a = document.createElement('a');
+  a.href = src;
+  a.download = (name||'slika') + '.jpg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
 window.switchDetailPhoto=(id,idx)=>{
   const p=people[id];
   const photos=p.photos&&p.photos.length?p.photos:(p.photo?[{data:p.photo}]:[]);
+  const src=photos[idx].url||photos[idx].data;
+  const name=`${p.ime||''}_${p.prez||''}`.trim()||'slika';
   const mainEl=document.getElementById('d-main-photo');
-  if(mainEl) mainEl.src=photos[idx].url||photos[idx].data;
+  if(mainEl){
+    mainEl.src=src;
+    // Update parent div onclick for lightbox
+    const wrapper=mainEl.parentElement;
+    if(wrapper) wrapper.onclick=()=>openLightbox(photos, idx, name);
+  }
+  const dlBtn=document.getElementById('d-dl-btn');
+  if(dlBtn) dlBtn.onclick=(e)=>{e.stopPropagation();downloadPhoto(src, name);};
   document.querySelectorAll('.detail-gallery-item').forEach((el,i)=>el.classList.toggle('active',i===idx));
 };
 
@@ -1112,7 +1258,7 @@ window.rejectPerson=async(id)=>{
 // ══════════════════════════════════════════════════════
 // PHOTO & COLOR
 // ══════════════════════════════════════════════════════
-function resizeImage(file, maxPx=500, quality=0.72){
+function resizeImage(file, maxPx=800, quality=0.82){
   return new Promise(resolve=>{
     const reader=new FileReader();
     reader.onload=ev=>{
@@ -1214,6 +1360,206 @@ function renderRC(){
 }
 window.pickRC=c=>{selectedColor=c;document.getElementById('f-color').value=c;renderRC();};
 function setCP(c){selectedColor=c;const el=document.getElementById('f-color');if(el)el.value=c;setTimeout(renderRC,30);}
+
+// ══════════════════════════════════════════════════════
+// LIGHTBOX
+// ══════════════════════════════════════════════════════
+let lbPhotos=[], lbIndex=0, lbScale=1, lbName='';
+let lbPanning=false, lbPanX=0, lbPanY=0, lbLastX=0, lbLastY=0, lbTransX=0, lbTransY=0;
+
+window.openLightbox=(photos, idx, name)=>{
+  lbPhotos=photos; lbIndex=idx; lbName=name||'slika';
+  lbScale=1; lbTransX=0; lbTransY=0;
+  const lb=document.getElementById('lightbox');
+  lb.classList.add('active'); lb.classList.remove('zoomed');
+  lbUpdate();
+  document.addEventListener('keydown', lbKeyHandler);
+};
+
+function lbUpdate(){
+  const img=document.getElementById('lb-img');
+  const src=lbPhotos[lbIndex].url||lbPhotos[lbIndex].data;
+  img.src=src;
+  img.style.transform=`translate(${lbTransX}px,${lbTransY}px) scale(${lbScale})`;
+  document.getElementById('lb-counter').textContent=
+    lbPhotos.length>1 ? `${lbIndex+1} / ${lbPhotos.length}` : '';
+  // Show/hide nav
+  document.getElementById('lb-nav-left').style.display=lbPhotos.length>1?'flex':'none';
+  document.getElementById('lb-nav-right').style.display=lbPhotos.length>1?'flex':'none';
+  document.getElementById('lightbox').classList.toggle('zoomed', lbScale>1);
+}
+
+window.lbZoom=(factor)=>{
+  lbScale=Math.max(1, Math.min(6, lbScale*factor));
+  if(lbScale===1){lbTransX=0; lbTransY=0;}
+  lbUpdate();
+};
+
+window.lbReset=()=>{
+  lbScale=1; lbTransX=0; lbTransY=0; lbUpdate();
+};
+
+window.lbNav=(dir)=>{
+  lbIndex=(lbIndex+dir+lbPhotos.length)%lbPhotos.length;
+  lbScale=1; lbTransX=0; lbTransY=0; lbUpdate();
+};
+
+window.lbClose=()=>{
+  document.getElementById('lightbox').classList.remove('active','zoomed');
+  document.removeEventListener('keydown', lbKeyHandler);
+  lbScale=1; lbTransX=0; lbTransY=0;
+};
+
+window.lbClickOutside=(e)=>{
+  if(e.target===document.getElementById('lightbox')) lbClose();
+};
+
+window.lbDownload=()=>{
+  const src=lbPhotos[lbIndex].url||lbPhotos[lbIndex].data;
+  const suffix=lbPhotos.length>1?`_${lbIndex+1}`:'';
+  downloadPhoto(src, lbName+suffix);
+};
+
+function lbKeyHandler(e){
+  if(e.key==='Escape') lbClose();
+  if(e.key==='ArrowLeft') lbNav(-1);
+  if(e.key==='ArrowRight') lbNav(1);
+  if(e.key==='+') lbZoom(1.3);
+  if(e.key==='-') lbZoom(0.77);
+}
+
+// Mouse wheel zoom
+document.getElementById('lightbox').addEventListener('wheel', e=>{
+  if(!document.getElementById('lightbox').classList.contains('active')) return;
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.15 : 0.87;
+  lbScale=Math.max(1, Math.min(6, lbScale*factor));
+  if(lbScale===1){lbTransX=0; lbTransY=0;}
+  lbUpdate();
+},{passive:false});
+
+// Pan when zoomed
+const lbEl=document.getElementById('lightbox');
+lbEl.addEventListener('mousedown', e=>{
+  if(lbScale<=1||e.target===lbEl) return;
+  lbPanning=true; lbLastX=e.clientX; lbLastY=e.clientY;
+  e.preventDefault();
+});
+window.addEventListener('mousemove', e=>{
+  if(!lbPanning) return;
+  lbTransX+=e.clientX-lbLastX; lbTransY+=e.clientY-lbLastY;
+  lbLastX=e.clientX; lbLastY=e.clientY;
+  document.getElementById('lb-img').style.transform=`translate(${lbTransX}px,${lbTransY}px) scale(${lbScale})`;
+});
+window.addEventListener('mouseup', ()=>{ lbPanning=false; });
+
+// Touch pinch zoom
+let lbLastTouchDist=null;
+lbEl.addEventListener('touchstart', e=>{
+  if(e.touches.length===2) lbLastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+},{passive:true});
+lbEl.addEventListener('touchmove', e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    if(lbLastTouchDist){ lbScale=Math.max(1,Math.min(6,lbScale*(d/lbLastTouchDist))); lbUpdate(); }
+    lbLastTouchDist=d;
+  }
+  e.preventDefault();
+},{passive:false});
+lbEl.addEventListener('touchend',()=>{lbLastTouchDist=null;});
+
+// ══════════════════════════════════════════════════════
+// LIGHTBOX
+// ══════════════════════════════════════════════════════
+let lbPhotos=[], lbIndex=0, lbScale=1, lbPersonName='';
+let lbDragging=false, lbDragStartX=0, lbDragStartY=0, lbTransX=0, lbTransY=0, lbLastX=0, lbLastY=0;
+
+window.openLightbox=(photos, idx, personName)=>{
+  lbPhotos=photos; lbIndex=idx; lbPersonName=personName||'slika';
+  lbScale=1; lbTransX=0; lbTransY=0;
+  const lb=document.getElementById('lightbox');
+  lb.classList.add('open');
+  lbRender();
+};
+
+function lbRender(){
+  const img=document.getElementById('lightbox-img');
+  const src=lbPhotos[lbIndex]?.url||lbPhotos[lbIndex]?.data||lbPhotos[lbIndex];
+  img.src=src;
+  img.style.transform=`scale(${lbScale}) translate(${lbTransX/lbScale}px,${lbTransY/lbScale}px)`;
+  img.classList.toggle('zoomed', lbScale>1);
+  const counter=document.getElementById('lb-counter');
+  if(lbPhotos.length>1) counter.textContent=`${lbIndex+1} / ${lbPhotos.length}`;
+  else counter.textContent='';
+  // show/hide prev/next
+  document.getElementById('lb-prev').style.display=lbPhotos.length>1?'flex':'none';
+  document.getElementById('lb-next').style.display=lbPhotos.length>1?'flex':'none';
+}
+
+window.lbClose=()=>{
+  document.getElementById('lightbox').classList.remove('open');
+  lbScale=1; lbTransX=0; lbTransY=0;
+};
+
+window.lbClickOutside=(e)=>{
+  if(e.target.id==='lightbox') lbClose();
+};
+
+window.lbNav=(dir)=>{
+  lbIndex=(lbIndex+dir+lbPhotos.length)%lbPhotos.length;
+  lbScale=1; lbTransX=0; lbTransY=0;
+  lbRender();
+};
+
+window.lbZoom=(factor)=>{
+  lbScale=Math.max(1,Math.min(5, lbScale*factor));
+  if(lbScale===1){lbTransX=0;lbTransY=0;}
+  lbRender();
+};
+
+window.lbToggleZoom=(e)=>{
+  if(lbScale>1){ lbScale=1; lbTransX=0; lbTransY=0; }
+  else { lbScale=2.5; }
+  lbRender();
+};
+
+window.lbDownload=()=>{
+  const src=lbPhotos[lbIndex]?.url||lbPhotos[lbIndex]?.data||lbPhotos[lbIndex];
+  const a=document.createElement('a');
+  a.href=src; a.download=lbPersonName+'_'+( lbIndex+1)+'.jpg';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+};
+
+// Mouse wheel zoom
+document.getElementById('lightbox').addEventListener('wheel',e=>{
+  if(!document.getElementById('lightbox').classList.contains('open'))return;
+  e.preventDefault();
+  lbZoom(e.deltaY<0?1.15:0.87);
+},{passive:false});
+
+// Drag to pan when zoomed
+const lbImg=document.getElementById('lightbox-img');
+lbImg.addEventListener('mousedown',e=>{
+  if(lbScale<=1)return;
+  lbDragging=true; lbDragStartX=e.clientX-lbTransX; lbDragStartY=e.clientY-lbTransY;
+  e.preventDefault();
+});
+window.addEventListener('mousemove',e=>{
+  if(!lbDragging)return;
+  lbTransX=e.clientX-lbDragStartX; lbTransY=e.clientY-lbDragStartY;
+  lbRender();
+});
+window.addEventListener('mouseup',()=>{ lbDragging=false; });
+
+// Keyboard navigation
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('lightbox').classList.contains('open'))return;
+  if(e.key==='Escape') lbClose();
+  if(e.key==='ArrowLeft') lbNav(-1);
+  if(e.key==='ArrowRight') lbNav(1);
+  if(e.key==='+') lbZoom(1.3);
+  if(e.key==='-') lbZoom(0.77);
+});
 
 window.addEventListener('resize',()=>redrawLines());
 
