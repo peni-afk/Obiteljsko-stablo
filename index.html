@@ -1007,6 +1007,8 @@ window.savePerson=async()=>{
 };
 
 let currentDetailPhotos=[];
+let currentDetailName='slika';
+let currentDetailIdx=0;
 window.openDetail=id=>{
   const p=people[id];
   document.getElementById('d-title').textContent=`${p.ime||''} ${p.prez||''}`;
@@ -1018,31 +1020,47 @@ window.openDetail=id=>{
   const photos = p.photos && p.photos.length ? p.photos : (p.photo ? [{data:p.photo}] : []);
   const ci = Math.min(p.coverIndex||0, Math.max(0,photos.length-1));
   currentDetailPhotos = photos;
+  currentDetailIdx = ci;
+  currentDetailName = `${p.ime||''}_${p.prez||''}`.trim()||'slika';
   const mainSrc = photos.length ? (photos[ci].url||photos[ci].data) : null;
-  const personName = `${p.ime||''}_${p.prez||''}`.trim()||'slika';
-  const allSrcs = photos.map(ph=>ph.url||ph.data||ph);
+
   let photoHTML = mainSrc
-    ? `<div style="position:relative;cursor:zoom-in;" onclick="openLightbox(currentDetailPhotos,0,''+personName+'')">
-        <img class="detail-main-photo" id="d-main-photo" src="${mainSrc}" alt="" style="cursor:zoom-in;">
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;"
-          onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
-          <span style="background:rgba(0,0,0,.55);color:#fff;padding:6px 14px;border-radius:2px;font-size:.78rem;font-family:'Crimson Pro',serif;letter-spacing:.06em;">🔍 Klikni za uvećanje</span>
+    ? `<div style="position:relative;cursor:zoom-in;" id="d-main-wrap">
+        <img class="detail-main-photo" id="d-main-photo" src="${mainSrc}" alt="">
+        <div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.6);
+          color:#fff;padding:4px 10px;border-radius:2px;font-size:.72rem;
+          font-family:'Crimson Pro',serif;letter-spacing:.05em;pointer-events:none;">
+          🔍 Klikni za uvećanje
         </div>
       </div>`
     : `<div class="detail-photo-ph">👤</div>`;
+
   if(photos.length>1){
-    photoHTML += `<div class="detail-gallery">`
+    photoHTML += '<div class="detail-gallery">'
       + photos.map((ph,i)=>{
-          const act=i===ci?' active':'';
-          return `<div class="detail-gallery-item${act}"
-            onclick="switchDetailPhoto('${id}',${i})"
-            ondblclick="openLightbox(currentDetailPhotos,${i},'${personName}')"
-            title="Klik=zamijeni · Dvoklik=uvećaj">
-            <img src="${ph.url||ph.data}" alt=""></div>`;
+          const act = i===ci ? ' active' : '';
+          const src = ph.url||ph.data||'';
+          return '<div class="detail-gallery-item'+act+'" data-idx="'+i+'" title="Klik=zamijeni · Dvoklik=uvećaj">'
+            + '<img src="'+src+'" alt=""></div>';
         }).join('')
-      + `</div>`;
+      + '</div>';
   }
   document.getElementById('d-photo').innerHTML=photoHTML;
+
+  // Attach click events after DOM is set
+  const mainWrap = document.getElementById('d-main-wrap');
+  if(mainWrap) mainWrap.addEventListener('click', ()=>openLightbox(currentDetailPhotos, currentDetailIdx, currentDetailName));
+
+  document.querySelectorAll('.detail-gallery-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const i = parseInt(el.dataset.idx);
+      switchDetailPhoto(id, i);
+    });
+    el.addEventListener('dblclick', ()=>{
+      const i = parseInt(el.dataset.idx);
+      openLightbox(currentDetailPhotos, i, currentDetailName);
+    });
+  });
 
   const canEdit=isAdmin||(p.createdBy===currentUser.uid);
   const canDel=isAdmin;
@@ -1066,16 +1084,9 @@ window.switchDetailPhoto=(id,idx)=>{
   const p=people[id];
   const photos=p.photos&&p.photos.length?p.photos:(p.photo?[{data:p.photo}]:[]);
   const src=photos[idx].url||photos[idx].data;
-  const name=`${p.ime||''}_${p.prez||''}`.trim()||'slika';
+  currentDetailIdx=idx;
   const mainEl=document.getElementById('d-main-photo');
-  if(mainEl){
-    mainEl.src=src;
-    // Update parent div onclick for lightbox
-    const wrapper=mainEl.parentElement;
-    if(wrapper) wrapper.onclick=()=>openLightbox(photos, idx, name);
-  }
-  const dlBtn=document.getElementById('d-dl-btn');
-  if(dlBtn) dlBtn.onclick=(e)=>{e.stopPropagation();downloadPhoto(src, name);};
+  if(mainEl) mainEl.src=src;
   document.querySelectorAll('.detail-gallery-item').forEach((el,i)=>el.classList.toggle('active',i===idx));
 };
 
@@ -1331,7 +1342,7 @@ window.openLightbox=(photos, idx, personName)=>{
   lbPhotos=photos; lbIndex=idx; lbPersonName=personName||'slika';
   lbScale=1; lbTransX=0; lbTransY=0;
   const lb=document.getElementById('lightbox');
-  lb.classList.add('open');
+  lb.classList.add('active');
   lbRender();
 };
 
@@ -1350,7 +1361,7 @@ function lbRender(){
 }
 
 window.lbClose=()=>{
-  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox').classList.remove('active');
   lbScale=1; lbTransX=0; lbTransY=0;
 };
 
@@ -1370,6 +1381,10 @@ window.lbZoom=(factor)=>{
   lbRender();
 };
 
+window.lbReset=()=>{
+  lbScale=1; lbTransX=0; lbTransY=0; lbRender();
+};
+
 window.lbToggleZoom=(e)=>{
   if(lbScale>1){ lbScale=1; lbTransX=0; lbTransY=0; }
   else { lbScale=2.5; }
@@ -1379,13 +1394,13 @@ window.lbToggleZoom=(e)=>{
 window.lbDownload=()=>{
   const src=lbPhotos[lbIndex]?.url||lbPhotos[lbIndex]?.data||lbPhotos[lbIndex];
   const a=document.createElement('a');
-  a.href=src; a.download=lbPersonName+'_'+( lbIndex+1)+'.jpg';
+  a.href=src; a.download=(lbPersonName||currentDetailName)+'_'+(lbIndex+1)+'.jpg';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 };
 
 // Mouse wheel zoom
 document.getElementById('lightbox').addEventListener('wheel',e=>{
-  if(!document.getElementById('lightbox').classList.contains('open'))return;
+  if(!document.getElementById('lightbox').classList.contains('active'))return;
   e.preventDefault();
   lbZoom(e.deltaY<0?1.15:0.87);
 },{passive:false});
@@ -1406,7 +1421,7 @@ window.addEventListener('mouseup',()=>{ lbDragging=false; });
 
 // Keyboard navigation
 document.addEventListener('keydown',e=>{
-  if(!document.getElementById('lightbox').classList.contains('open'))return;
+  if(!document.getElementById('lightbox').classList.contains('active'))return;
   if(e.key==='Escape') lbClose();
   if(e.key==='ArrowLeft') lbNav(-1);
   if(e.key==='ArrowRight') lbNav(1);
